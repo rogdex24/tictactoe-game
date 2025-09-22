@@ -1,6 +1,6 @@
 module github.com/example/tictactoe/backend
 
-go 1.21
+go 1.22
 
 require github.com/heroiclabs/nakama-common v1.27.0
 

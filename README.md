@@ -19,8 +19,9 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
 
 ## Prerequisites
 
-- [pnpm](https://pnpm.io/) 8+
-- [Go](https://go.dev/) 1.21+
+- [Node.js](https://nodejs.org/) 20 LTS
+- [pnpm](https://pnpm.io/) 9 LTS
+- [Go](https://go.dev/) 1.22+
 - [Docker](https://www.docker.com/)
 - [golangci-lint](https://golangci-lint.run/)
 - [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports)

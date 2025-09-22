@@ -2,7 +2,7 @@
   "name": "tictactoe-monorepo",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@8.15.8",
+  "packageManager": "pnpm@9.15.9",
   "workspaces": [
     "frontend",
     "backend"
