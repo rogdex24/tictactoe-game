@@ -1,0 +1,14 @@
+run:
+  timeout: 3m
+  tests: true
+linters:
+  enable:
+    - govet
+    - errcheck
+    - gofmt
+    - goimports
+    - revive
+issues:
+  exclude-use-default: false
+  max-same-issues: 0
+  max-issues-per-linter: 0

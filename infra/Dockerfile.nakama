@@ -1,0 +1,7 @@
+FROM heroiclabs/nakama:3.21.1
+
+COPY backend/build/*.so /nakama/data/modules/
+COPY backend/modules /nakama/data/modules/src
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/nakama/nakama", "--config", "/nakama/data/config.yml"]

@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      pnpm_cache_dir: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            \${{ runner.os }}-pnpm-
+      - run: pnpm install --frozen-lockfile
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - run: pnpm --filter backend test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - run: pnpm --filter backend build
+      - name: Docker build
+        run: docker build -f infra/Dockerfile.nakama -t tictactoe/nakama:ci .
+      - name: Push to Artifact Registry
+        if: github.ref == 'refs/heads/main'
+        env:
+          GCP_ARTIFACT_REPOSITORY: \${{ secrets.GCP_ARTIFACT_REPOSITORY }}
+        run: |
+          if [ -z "$GCP_ARTIFACT_REPOSITORY" ]; then
+            echo "GCP_ARTIFACT_REPOSITORY secret is not set. Skipping push."
+            exit 0
+          fi
+          echo "$GCP_ARTIFACT_REPOSITORY" | awk -F'/' '{print $1}' | xargs gcloud auth configure-docker
+          docker tag tictactoe/nakama:ci "$GCP_ARTIFACT_REPOSITORY"
+          docker push "$GCP_ARTIFACT_REPOSITORY"
