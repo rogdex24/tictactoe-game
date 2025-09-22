@@ -111,6 +111,9 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs linting, tests, builds
 
 ## Contributing
 
-- Pre-commit hooks format JavaScript/TypeScript and Go sources via `lint-staged`.
+- Commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) spec. A Husky `commit-msg` hook
+  runs Commitlint to enforce the format and prevent malformed commit messages from landing in the repository.
+- Pre-commit hooks format JavaScript/TypeScript and Go sources via `lint-staged`, ensuring ESLint/Prettier and `goimports` +
+  `golangci-lint` run automatically on staged changes.
 - Pre-push hooks run the full lint and test suites.
 - Always run `pnpm test` before opening a pull request.
