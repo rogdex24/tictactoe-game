@@ -5,7 +5,7 @@
   "scripts": {
     "lint": "golangci-lint run ./...",
     "test": "go test ./...",
-    "build": "sh -c 'mkdir -p build && go build -buildmode=plugin -o build/match_handler.so ./modules'",
+    "build": "sh -c 'mkdir -p build && go build -buildmode=plugin -o build/match_handler.so ./cmd/plugin'",
     "format": "go fmt ./...",
     "typecheck": "go vet ./..."
   }

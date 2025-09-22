@@ -37,7 +37,21 @@ jobs:
         with:
           node-version: 'lts/*'
       - uses: pnpm/action-setup@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+          cache: true
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            \${{ runner.os }}-pnpm-
       - run: pnpm install --frozen-lockfile
+      - run: ./scripts/install-go-tools.sh
       - run: pnpm lint
 
   test:
@@ -49,12 +63,22 @@ jobs:
         with:
           node-version: 'lts/*'
       - uses: pnpm/action-setup@v4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22.x'
-      - run: pnpm --filter backend test
+          cache: true
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            \${{ runner.os }}-pnpm-
+      - run: pnpm install --frozen-lockfile
+      - run: ./scripts/install-go-tools.sh
+      - run: pnpm test
 
   build:
     runs-on: ubuntu-latest
@@ -65,12 +89,22 @@ jobs:
         with:
           node-version: 'lts/*'
       - uses: pnpm/action-setup@v4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22.x'
-      - run: pnpm --filter backend build
+          cache: true
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            \${{ runner.os }}-pnpm-
+      - run: pnpm install --frozen-lockfile
+      - run: ./scripts/install-go-tools.sh
+      - run: pnpm build
       - name: Docker build
         run: docker build -f infra/Dockerfile.nakama -t tictactoe/nakama:ci .
       - name: Push to Artifact Registry

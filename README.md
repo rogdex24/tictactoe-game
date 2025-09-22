@@ -35,20 +35,26 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
    pnpm install
    ```
 
-2. Prepare Husky git hooks
+2. Install the Go developer tooling (golangci-lint & goimports)
+
+   ```bash
+   ./scripts/install-go-tools.sh
+   ```
+
+3. Prepare Husky git hooks
 
    ```bash
    pnpm prepare
    ```
 
-3. Start the local Nakama stack (PostgreSQL + Nakama + plugin)
+4. Start the local Nakama stack (PostgreSQL + Nakama + plugin)
 
    ```bash
    pnpm --filter backend build
    pnpm --filter backend run
    ```
 
-4. Launch the Expo development server
+5. Launch the Expo development server
 
    ```bash
    pnpm --filter frontend start

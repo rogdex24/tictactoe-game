@@ -5,7 +5,7 @@ BUILD_DIR=build
 
 build:
 mkdir -p $(BUILD_DIR)
-go build -buildmode=plugin -o $(BUILD_DIR)/$(PLUGIN_NAME) ./modules
+go build -buildmode=plugin -o $(BUILD_DIR)/$(PLUGIN_NAME) ./cmd/plugin
 
 run:
 docker compose -f ../infra/docker-compose.yml up
@@ -14,7 +14,7 @@ lint:
 golangci-lint run ./...
 
 fmt:
-goimports -w ./modules
+goimports -w ./modules ./cmd
 
 test:
 go test ./...
