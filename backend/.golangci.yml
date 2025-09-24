@@ -1,0 +1,25 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly # Don't download missing modules
+
+linters:
+  enable:
+    - errcheck
+    - gofmt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    # Remove memory-heavy staticcheck analyzers for now
+  disable-all: true
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
+  exclude-dirs:
+    - vendor
+    - node_modules
+    - .git
+  exclude-files:
+    - ".*\\.pb\\.go$"
+    - ".*_generated\\.go$"

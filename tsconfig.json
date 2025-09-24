@@ -5,8 +5,7 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@frontend/*": ["frontend/*"],
-      "@backend/*": ["backend/*"]
+      "@frontend/*": ["frontend/*"]
     },
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -14,6 +13,6 @@
     "skipLibCheck": true,
     "strict": true
   },
-  "include": ["frontend", "backend"],
+  "include": ["frontend"],
   "exclude": ["node_modules", "**/build", "**/dist"]
 }

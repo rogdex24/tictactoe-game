@@ -21,7 +21,7 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
 
 - [Node.js](https://nodejs.org/) 20 LTS
 - [pnpm](https://pnpm.io/) 9 LTS
-- [Go](https://go.dev/) 1.22+
+- [Go](https://go.dev/) 1.25+
 - [Docker](https://www.docker.com/)
 - [golangci-lint](https://golangci-lint.run/)
 - [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports)
@@ -41,20 +41,45 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
    ./scripts/install-go-tools.sh
    ```
 
+   Add Go's tool bin to your shell path if it's not already there:
+
+   ```bash
+   export PATH="$HOME/go/bin:$PATH"
+   ```
+
 3. Prepare Husky git hooks
 
    ```bash
    pnpm prepare
    ```
 
-4. Start the local Nakama stack (PostgreSQL + Nakama + plugin)
+4. Download the Nakama macOS binary (Apple Silicon or Intel detected automatically)
 
    ```bash
-   pnpm --filter backend build
-   pnpm --filter backend run
+   ./scripts/setup-nakama-macos.sh
    ```
 
-5. Launch the Expo development server
+5. Start PostgreSQL (Docker) and run Nakama locally
+
+   ```bash
+   ./scripts/run-nakama-local.sh
+   ```
+
+   The script rebuilds the Go plugin for the host architecture into `backend/build/darwin-<arch>/` and then tails the Nakama process. Set `NAKAMA_SKIP_PLUGIN=1` if you want to launch Nakama without loading the custom module. Press `Ctrl+C` to stop the server.
+
+   Once Nakama reports that runtime initialization succeeded, you can confirm it is reachable:
+
+   ```bash
+   ./scripts/check-backend-health.sh
+   ```
+
+   Stop Postgres afterwards with:
+
+   ```bash
+   docker compose -f infra/docker-compose.yml down
+   ```
+
+6. Launch the Expo development server
 
    ```bash
    pnpm --filter frontend start
@@ -81,15 +106,15 @@ pnpm typecheck  # Runs TypeScript and Go vet checks
 
 ### Backend
 
-- `pnpm --filter backend build` – Builds the Nakama plugin (`.so`)
+- `pnpm --filter backend build` – Builds the Nakama plugin (Linux target for CI/CD)
 - `pnpm --filter backend test` – Runs Go tests
 - `pnpm --filter backend lint` – `golangci-lint`
 - `pnpm --filter backend typecheck` – `go vet`
-- `make -C backend run` – Starts Nakama + PostgreSQL via Docker Compose
+- `./scripts/run-nakama-local.sh` – macOS development server (Postgres via Docker, Nakama native binary)
 
 ### Infrastructure
 
-- `make -C infra up` – Launches Docker Compose services
+- `docker compose -f infra/docker-compose.yml up -d postgres` – Start local Postgres only
 - `make -C infra deploy` – Builds & pushes the Nakama Docker image to GCP Artifact Registry (requires authentication)
 
 ## Authentication & Matchmaking Overview

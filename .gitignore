@@ -23,10 +23,12 @@ ios/
 # Go builds
 backend/build/
 backend/bin/
+data/
 
 # Docker artifacts
 infra/.env
 infra/.tmp
+infra/bin/
 
 # Coverage
 coverage/

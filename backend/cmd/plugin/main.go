@@ -10,5 +10,6 @@ import (
 )
 
 func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) error {
+	logger.Info("Initializing Tic-Tac-Toe Go module")
 	return modules.InitModule(ctx, logger, db, nk, initializer)
 }

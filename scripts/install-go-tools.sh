@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Default toolchain to align with Go 1.22 LTS unless the caller overrides it.
-: "${GO_TOOLCHAIN_VERSION:=go1.22.9}"
+# Default toolchain to align with Nakama 3.32 (Go 1.25.0) unless overridden.
+: "${GO_TOOLCHAIN_VERSION:=go1.25.0}"
 export GOTOOLCHAIN="${GOTOOLCHAIN:-$GO_TOOLCHAIN_VERSION}"
 
 # pin exact tool versions to keep CI and local environments in sync
-GOIMPORTS_VERSION="v0.24.0"
-GOLANGCI_LINT_VERSION="v1.61.0"
+GOIMPORTS_VERSION="v0.27.0"
+GOLANGCI_LINT_VERSION="v1.64.0"
 
 printf 'Installing Go tools with toolchain %s\n' "$GOTOOLCHAIN"
 
