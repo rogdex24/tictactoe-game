@@ -53,13 +53,13 @@ if git rev-parse --git-dir >/dev/null 2>&1 && git rev-parse HEAD >/dev/null 2>&1
 fi
 
 REL_FILES=()
-for file in "${CHANGED_FILES[@]}"; do
+for file in "${CHANGED_FILES[@]-}"; do
   if [[ "$file" == backend/* ]]; then
     REL_FILES+=("${file#backend/}")
   fi
 done
 
-if [[ ${#REL_FILES[@]} -eq 0 ]]; then
+if [[ ${#REL_FILES[@]-0} -eq 0 ]]; then
   echo "No Go files to lint"
   exit 0
 fi
