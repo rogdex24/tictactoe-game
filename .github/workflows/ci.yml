@@ -7,10 +7,8 @@ on:
       - main
 
 jobs:
-  setup:
+  frontend:
     runs-on: ubuntu-latest
-    outputs:
-      pnpm_cache_dir: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,93 +16,50 @@ jobs:
           node-version: 'lts/*'
       - uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
-        id: pnpm-cache
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Cache pnpm store
+        uses: actions/cache@v4
         with:
-          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: \${{ env.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-store-\${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            \${{ runner.os }}-pnpm-
+            \${{ runner.os }}-pnpm-store-
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend lint
+      - run: pnpm --filter frontend test
+      - run: pnpm --filter frontend build
 
-  lint:
+  backend:
     runs-on: ubuntu-latest
-    needs: setup
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-      - uses: pnpm/action-setup@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
-          cache: true
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
         with:
-          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: \${{ runner.os }}-go-\${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            \${{ runner.os }}-pnpm-
-      - run: pnpm install --frozen-lockfile
-      - run: ./scripts/install-go-tools.sh
-      - run: pnpm lint
-
-  test:
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.x'
-          cache: true
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
-        with:
-          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            \${{ runner.os }}-pnpm-
-      - run: pnpm install --frozen-lockfile
-      - run: ./scripts/install-go-tools.sh
-      - run: pnpm test
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.x'
-          cache: true
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
-        with:
-          path: \${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: \${{ runner.os }}-pnpm-\${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            \${{ runner.os }}-pnpm-
-      - run: pnpm install --frozen-lockfile
-      - run: ./scripts/install-go-tools.sh
-      - run: pnpm build
+            \${{ runner.os }}-go-
+      - name: Add Go bin to PATH
+        run: echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Install Go tooling
+        run: ./scripts/install-go-tools.sh
+      - name: Lint backend
+        working-directory: backend
+        run: golangci-lint run ./...
+      - name: Run backend tests
+        working-directory: backend
+        run: go test ./...
+      - name: Build backend plugin (linux/amd64)
+        working-directory: backend
+        run: |
+          mkdir -p build
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildmode=plugin -o build/match_handler.so ./cmd/plugin
       - name: Docker build
         run: docker build -f infra/Dockerfile.nakama -t tictactoe/nakama:ci .
       - name: Push to Artifact Registry
