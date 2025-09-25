@@ -117,13 +117,6 @@ pnpm typecheck  # Runs TypeScript and Go vet checks
 - `docker compose -f infra/docker-compose.yml up -d postgres` – Start local Postgres only
 - `make -C infra deploy` – Builds & pushes the Nakama Docker image to GCP Artifact Registry (requires authentication)
 
-## Authentication & Matchmaking Overview
-
-- **Device Authentication**: Clients call the `device_auth` RPC with a stable device ID. The Go plugin authenticates/creates a user and returns a JWT.
-- **Match Handler**: The server runs a deterministic Tic-Tac-Toe match loop with authoritative move validation, state broadcasting, and heartbeats.
-- **Matchmaking Queues**: Extend the current match handler by registering additional labels for new game modes and using Nakama's matchmaker API.
-- **Leaderboard**: Use `LeaderboardRecordWrite` helper to record scores and maintain rankings.
-
 ## Environment Variables
 
 Copy `.env.example` to `.env` and adjust credentials for local development or CI.
