@@ -6,7 +6,7 @@ import React from 'react';
 
 const Stack = createNativeStackNavigator();
 
-function HomeScreen(): JSX.Element {
+function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -18,7 +18,7 @@ function HomeScreen(): JSX.Element {
   );
 }
 
-export default function App(): JSX.Element {
+export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator>
