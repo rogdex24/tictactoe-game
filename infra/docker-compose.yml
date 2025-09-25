@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nakama}
+      POSTGRES_USER: ${POSTGRES_USER:-nakama}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+# Not using for local development as - Nakama doesn't offer official ARM64/Apple Silicon containers - using the binary instead
+# nakama:
+#   build:
+#     context: ..
+#     dockerfile: infra/Dockerfile.nakama
+#   depends_on:
+#     - postgres
+#   restart: unless-stopped
+#   environment:
+#     - socket.ssl_certificate=
+#     - socket.ssl_private_key=
+#     - database.address=postgres:5432
+#     - database.user=${POSTGRES_USER:-nakama}
+#     - database.password=${POSTGRES_PASSWORD:-local-password}
+#     - database.name=${POSTGRES_DB:-nakama}
+#     - console.port=7351
+#     - runtime.path=/nakama/data/modules
+#     - GODEBUG=plugin=2
+#   volumes:
+#     - ../backend/build:/nakama/data/modules
+#   command:
+#     [
+#       '/bin/sh',
+#       '-ecx',
+#       '/nakama/nakama migrate up --database.address ${POSTGRES_USER:-nakama}:${POSTGRES_PASSWORD:-local-password}@postgres:5432/${POSTGRES_DB:-nakama} && exec /nakama/nakama --name nakama-dev --database.address ${POSTGRES_USER:-nakama}:${POSTGRES_PASSWORD:-local-password}@postgres:5432/${POSTGRES_DB:-nakama}',
+#     ]
+#   ports:
+#     - '7350:7350'
+#     - '7351:7351'
+#     - '7349:7349'
+
+volumes:
+  postgres-data:

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: \${{ env.STORE_PATH }}
+          key: \${{ runner.os }}-pnpm-store-\${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            \${{ runner.os }}-pnpm-store-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend lint
+      - run: pnpm --filter frontend test
+      - run: pnpm --filter frontend build
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: \${{ runner.os }}-go-\${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            \${{ runner.os }}-go-
+      - name: Add Go bin to PATH
+        run: echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Install Go tooling
+        run: ./scripts/install-go-tools.sh
+      - name: Lint backend
+        working-directory: backend
+        run: golangci-lint run ./...
+      - name: Run backend tests
+        working-directory: backend
+        run: go test ./...
+      - name: Build backend plugin (linux/amd64)
+        working-directory: backend
+        run: |
+          mkdir -p build
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildmode=plugin -o build/match_handler.so ./cmd/plugin
+      - name: Docker build
+        run: docker build -f infra/Dockerfile.nakama -t tictactoe/nakama:ci .
+      - name: Push to Artifact Registry
+        if: github.ref == 'refs/heads/main'
+        env:
+          GCP_ARTIFACT_REPOSITORY: \${{ secrets.GCP_ARTIFACT_REPOSITORY }}
+        run: |
+          if [ -z "$GCP_ARTIFACT_REPOSITORY" ]; then
+            echo "GCP_ARTIFACT_REPOSITORY secret is not set. Skipping push."
+            exit 0
+          fi
+          echo "$GCP_ARTIFACT_REPOSITORY" | awk -F'/' '{print $1}' | xargs gcloud auth configure-docker
+          docker tag tictactoe/nakama:ci "$GCP_ARTIFACT_REPOSITORY"
+          docker push "$GCP_ARTIFACT_REPOSITORY"

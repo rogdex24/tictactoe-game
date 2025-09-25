@@ -1,0 +1,23 @@
+# Not using for local development as - Nakama doesn't offer official ARM64/Apple Silicon containers - using the binary instead
+FROM heroiclabs/nakama-pluginbuilder:3.32.0 AS builder
+
+WORKDIR /workspace/backend
+COPY backend/go.mod backend/go.sum ./
+RUN export PATH=$PATH:/usr/local/go/bin \ 
+    && go mod download
+COPY backend/ ./
+ENV PATH="/usr/local/go/bin:${PATH}" \
+    GOOS=linux \
+    GOARCH=amd64 \
+    CGO_ENABLED=1 \
+    GOAMD64=v1
+RUN mkdir -p build && go build -trimpath -buildmode=plugin -o build/match_handler.so ./cmd/plugin
+
+FROM heroiclabs/nakama:3.32.0
+
+COPY --from=builder /workspace/backend/build/match_handler.so /nakama/data/modules/match_handler.so
+COPY backend/modules /nakama/data/modules/src
+COPY infra/entrypoint.sh /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/nakama/nakama", "--config", "/nakama/data/config.yml"]
