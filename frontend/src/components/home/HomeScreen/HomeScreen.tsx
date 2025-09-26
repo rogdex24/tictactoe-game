@@ -1,9 +1,10 @@
-import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../../../styles/colors';
 import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
