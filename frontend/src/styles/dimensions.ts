@@ -24,6 +24,7 @@ export const layout = {
   screenWidth: width,
   screenHeight: height,
   maxContentWidth: 420,
+  boardMaxSize: 300,
 };
 
 export const iconSizes = {

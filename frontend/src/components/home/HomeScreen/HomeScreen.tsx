@@ -90,7 +90,7 @@ export const HomeScreen: React.FC = () => {
 };
 
 const EditIcon: React.FC = () => (
-  <Svg height={20} viewBox="0 0 24 24" width={20}>
+  <Svg height={18} viewBox="0 0 24 24" width={18}>
     <Path
       d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm18-11.49a1 1 0 0 0 0-1.41l-1.59-1.59a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.08-1.08Z"
       fill={colors.textTealSoft}
@@ -139,8 +139,8 @@ const styles = StyleSheet.create({
   },
   editButton: {
     marginLeft: spacing.xs,
-    width: 36,
-    height: 36,
+    width: 28,
+    height: 28,
   },
   header: {
     alignItems: 'center',

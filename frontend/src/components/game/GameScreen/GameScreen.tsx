@@ -1,10 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlayer } from '../../../state/PlayerContext';
@@ -14,14 +13,38 @@ import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
-import { GameBoard } from '../GameBoard';
+import { GameBoard, GameSymbol } from '../GameBoard';
 
-const TurnIcon: React.FC = () => (
-  <Svg height={32} viewBox="0 0 100 100" width={32}>
-    <Path d="M20 20 L80 80" stroke={colors.accentMint} strokeLinecap="round" strokeWidth={12} />
-    <Path d="M80 20 L20 80" stroke={colors.accentMint} strokeLinecap="round" strokeWidth={12} />
-  </Svg>
-);
+type PlayerMark = 'X' | 'O';
+
+type GameState = 'PLAYING' | 'WON' | 'DRAW';
+
+const WINNING_COMBINATIONS: Array<[number, number, number]> = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6],
+];
+
+const evaluateBoard = (
+  cells: (PlayerMark | null)[],
+): { winner: PlayerMark | null; line: [number, number, number] | null } => {
+  for (const combination of WINNING_COMBINATIONS) {
+    const [a, b, c] = combination;
+    const candidate = cells[a];
+    if (candidate && candidate === cells[b] && candidate === cells[c]) {
+      return { winner: candidate, line: combination };
+    }
+  }
+
+  return { winner: null, line: null };
+};
+
+const isBoardFull = (cells: (PlayerMark | null)[]) => cells.every((cell) => cell !== null);
 
 export const GameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -32,6 +55,86 @@ export const GameScreen: React.FC = () => {
   };
 
   const displayName = playerName || 'Player';
+
+  const [board, setBoard] = useState<(PlayerMark | null)[]>(Array(9).fill(null));
+  const [currentPlayer, setCurrentPlayer] = useState<PlayerMark>('X');
+  const [gameState, setGameState] = useState<GameState>('PLAYING');
+  const [statusMessage, setStatusMessage] = useState<string>('Your Turn');
+  const [winner, setWinner] = useState<PlayerMark | null>(null);
+  const [winningCells, setWinningCells] = useState<number[] | null>(null);
+
+  const resetGame = useCallback(() => {
+    setBoard(Array(9).fill(null));
+    setCurrentPlayer('X');
+    setGameState('PLAYING');
+    setWinner(null);
+    setWinningCells(null);
+    setStatusMessage('Your Turn');
+  }, []);
+
+  useEffect(() => {
+    resetGame();
+  }, [resetGame]);
+
+  useEffect(() => {
+    if (gameState === 'PLAYING') {
+      setStatusMessage(currentPlayer === 'X' ? 'Your Turn' : 'Opponent Turn');
+    }
+  }, [currentPlayer, gameState]);
+
+  const handleCellPress = useCallback(
+    (index: number) => {
+      if (gameState !== 'PLAYING' || board[index]) {
+        return;
+      }
+
+      const nextBoard = [...board];
+      nextBoard[index] = currentPlayer;
+      setBoard(nextBoard);
+
+      const { winner: roundWinner, line } = evaluateBoard(nextBoard);
+
+      if (roundWinner) {
+        setGameState('WON');
+        setWinner(roundWinner);
+        setWinningCells(line);
+        setStatusMessage(`${roundWinner} Wins!`);
+        return;
+      }
+
+      if (isBoardFull(nextBoard)) {
+        setGameState('DRAW');
+        setWinningCells(null);
+        setStatusMessage("It's a Draw!");
+        return;
+      }
+
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+    },
+    [board, currentPlayer, gameState],
+  );
+
+  const boardDisabled = gameState !== 'PLAYING';
+
+  const activeSymbol = useMemo<PlayerMark>(() => {
+    if (gameState === 'WON' && winner) {
+      return winner;
+    }
+
+    return currentPlayer;
+  }, [currentPlayer, gameState, winner]);
+
+  const statusColor = useMemo(() => {
+    if (gameState === 'WON') {
+      return winner === 'X' ? colors.accentMint : colors.accentTealSoft;
+    }
+
+    if (gameState === 'DRAW') {
+      return colors.accentDraw;
+    }
+
+    return currentPlayer === 'X' ? colors.accentMint : colors.textTealHighlight;
+  }, [currentPlayer, gameState, winner]);
 
   return (
     <LinearGradient
@@ -56,10 +159,17 @@ export const GameScreen: React.FC = () => {
           </View>
           <View style={styles.body}>
             <View style={styles.turnIndicator}>
-              <Text style={styles.turnLabel}>Your Turn</Text>
-              <TurnIcon />
+              <Text style={[styles.turnLabel, { color: statusColor }]}>{statusMessage}</Text>
+              <View style={styles.turnIcon}>
+                <GameSymbol mark={activeSymbol} />
+              </View>
             </View>
-            <GameBoard />
+            <GameBoard
+              cells={board}
+              disabled={boardDisabled}
+              onCellPress={handleCellPress}
+              winningCells={winningCells}
+            />
           </View>
           <View style={styles.footer}>
             <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
@@ -141,6 +251,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: colors.accentMint,
     marginRight: spacing.sm,
+  },
+  turnIcon: {
+    width: 32,
+    height: 32,
   },
   footer: {
     width: '100%',
