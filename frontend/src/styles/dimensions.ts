@@ -9,6 +9,7 @@ export const spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+  hero: 64,
 };
 
 export const radius = {
@@ -23,9 +24,16 @@ export const layout = {
   screenWidth: width,
   screenHeight: height,
   maxContentWidth: 420,
+  homeCardMaxWidth: 384,
+  homeCardMaxHeight: 750,
+  homeCardHeightRatio: 0.85,
 };
 
 export const iconSizes = {
-  large: Math.min(width * 0.5, 180),
-  medium: Math.min(width * 0.3, 120),
+  homeCircle: 144,
+  homeCross: 176,
+};
+
+export const offsets = {
+  homeGraphicLift: -64,
 };

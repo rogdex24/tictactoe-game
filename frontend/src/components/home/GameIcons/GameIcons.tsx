@@ -1,69 +1,49 @@
 import { StyleSheet, View } from 'react-native';
+import SvgComponent, { Circle, Path } from 'react-native-svg';
 
 import React from 'react';
-import SvgComponent, { Circle, Line } from 'react-native-svg';
 
 import { colors } from '../../../styles/colors';
 import { iconSizes } from '../../../styles/dimensions';
 
 export const GameIcons: React.FC = () => {
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       <SvgComponent
-        width={iconSizes.large}
-        height={iconSizes.large}
-        viewBox="0 0 120 120"
-        style={[styles.icon, styles.iconTopLeft]}
+        width={iconSizes.homeCircle}
+        height={iconSizes.homeCircle}
+        viewBox="0 0 100 100"
+        style={[styles.icon, styles.circle]}
       >
         <Circle
-          cx="60"
-          cy="60"
-          r="46"
-          stroke={colors.surfacePrimary}
-          strokeWidth="12"
-          fill="transparent"
-          opacity={0.9}
-        />
-      </SvgComponent>
-      <SvgComponent
-        width={iconSizes.medium}
-        height={iconSizes.medium}
-        viewBox="0 0 120 120"
-        style={[styles.icon, styles.iconBottomLeft]}
-      >
-        <Line
-          x1="20"
-          y1="20"
-          x2="100"
-          y2="100"
-          stroke={colors.surfacePrimary}
-          strokeWidth="12"
-          strokeLinecap="round"
-        />
-        <Line
-          x1="100"
-          y1="20"
-          x2="20"
-          y2="100"
-          stroke={colors.surfacePrimary}
-          strokeWidth="12"
-          strokeLinecap="round"
-        />
-      </SvgComponent>
-      <SvgComponent
-        width={iconSizes.medium}
-        height={iconSizes.medium}
-        viewBox="0 0 120 120"
-        style={[styles.icon, styles.iconTopRight]}
-      >
-        <Circle
-          cx="60"
-          cy="60"
+          cx="50"
+          cy="50"
           r="40"
           stroke={colors.surfacePrimary}
-          strokeWidth="10"
-          fill="transparent"
-          opacity={0.75}
+          strokeWidth="12"
+          opacity={0.7}
+          fill="none"
+        />
+      </SvgComponent>
+      <SvgComponent
+        width={iconSizes.homeCross}
+        height={iconSizes.homeCross}
+        viewBox="0 0 100 100"
+        style={[styles.icon, styles.cross]}
+      >
+        <Path
+          d="M20 20 L80 80"
+          stroke={colors.surfacePrimary}
+          strokeWidth="12"
+          strokeLinecap="round"
+          opacity={0.7}
+        />
+        <Path
+          d="M80 20 L20 80"
+          stroke={colors.surfacePrimary}
+          strokeWidth="12"
+          strokeLinecap="round"
+          opacity={0.7}
         />
       </SvgComponent>
     </View>
@@ -74,20 +54,14 @@ const styles = StyleSheet.create({
   icon: {
     position: 'absolute',
   },
-  iconTopLeft: {
-    top: 64,
-    left: -40,
-    transform: [{ rotate: '12deg' }],
+  circle: {
+    top: 0,
+    left: -24,
+    transform: [{ rotate: '15deg' }],
   },
-  iconBottomLeft: {
-    bottom: 24,
-    left: 32,
-    transform: [{ rotate: '-18deg' }],
-    opacity: 0.7,
-  },
-  iconTopRight: {
-    top: 120,
+  cross: {
+    bottom: 0,
     right: -24,
-    transform: [{ rotate: '-6deg' }],
+    transform: [{ rotate: '-15deg' }],
   },
 });

@@ -19,10 +19,10 @@ The Expo React Native client renders the multiplayer Tic-Tac-Toe experience. Scr
 
 ## Design System
 
-- **Colors:** Use palette exports from `src/styles/colors.ts`. Do not hard-code hex values inside components; extend the palette instead.
-- **Typography:** Always reference text styles or font families from `src/styles/typography.ts`. Heading scales leverage Montserrat Regular/Bold/ExtraBold.
-- **Spacing & Radii:** Import values from `src/styles/dimensions.ts` for padding, gaps, and rounded corners. Extend these tokens when new values are required.
-- **Icons & Illustration:** SVG-based icons live in `src/components/home/GameIcons`. Reuse and compose SVG primitives instead of embedding raw XML strings.
+- **Colors:** Use palette exports from `src/styles/colors.ts`. Do not hard-code hex values inside components; extend the palette instead. Notable tokens for the home screen include the `screenBackground`, `gradientStart`/`gradientEnd` blend, `textTealSoft` subtitle tint, and the translucent `glowCoral`/`glowTeal` fills used for the blurred backdrops.
+- **Typography:** Always reference text styles or font families from `src/styles/typography.ts`. The landing screen uses `typography.displayHero` for the “Tic Tac Toe” title, `typography.bodyPrimary` for supporting copy, and `typography.buttonPrimary` for the CTA label. Heading scales leverage Montserrat Regular/Bold/ExtraBold.
+- **Spacing & Radii:** Import values from `src/styles/dimensions.ts` for padding, gaps, rounded corners, and offsets. The start screen relies on `radius.xl` for the card shell, `radius.md` for the CTA button, and uses `layout.homeCard*` and `offsets.homeGraphicLift` to keep proportions consistent with the HTML reference.
+- **Icons & Illustration:** SVG-based icons live in `src/components/home/GameIcons`. Reuse and compose SVG primitives instead of embedding raw XML strings. The X/O hero art should remain centered within a `192px` stage to preserve alignment with the provided reference.
 - **Gradients:** Prefer `react-native-linear-gradient` for decorative gradients. Keep start/end coordinates explicit so future tweaks remain predictable.
 
 ## Component Patterns
@@ -43,6 +43,16 @@ The Expo React Native client renders the multiplayer Tic-Tac-Toe experience. Scr
 
 - Custom fonts reside in `assets/fonts`. Register new families in `react-native.config.js` and load them via `expo-font` in `App.tsx`.
 - Keep SVG illustrations as code—avoid bundling massive binary assets unless essential.
+
+## Home Screen Reference
+
+The `HomeScreen` component intentionally mirrors the provided Tailwind/HTML concept:
+
+- A centered card constrained by `layout.homeCardMaxWidth` × `layout.homeCardMaxHeight` with a diagonal gradient, 40px radius, white border at 10% opacity, and deep drop shadow.
+- Dual backdrop glows positioned via percentages and negative margins to reproduce the blurred coral and teal halos from the mock-up.
+- The hero title splits across two lines using Montserrat ExtraBold at 96px, while the teal subtitle uses Montserrat Regular at 16px with 70% opacity.
+- The O and X illustrations match the reference sizes (144px circle, 176px cross), rotations (±15°), and placement offsets (±24px) to achieve a pixel-faithful overlap.
+- The “Start Game” button stretches full width, uses the coral brand color, casts a soft shadow (`colors.buttonShadow`), and nudges downward 2px on press to emulate the HTML active state.
 
 ## Testing Expectations
 

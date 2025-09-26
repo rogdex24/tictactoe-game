@@ -2,27 +2,23 @@ export const typography = {
   fontFamilyRegular: 'Montserrat-Regular',
   fontFamilyBold: 'Montserrat-Bold',
   fontFamilyExtraBold: 'Montserrat-ExtraBold',
-  headingXXL: {
+  displayHero: {
     fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 64,
-    letterSpacing: -1.5,
-    lineHeight: 68,
+    fontSize: 96,
+    lineHeight: 96,
+    letterSpacing: 0.5,
   },
-  headingSubtitle: {
-    fontFamily: 'Montserrat-Bold',
-    fontSize: 18,
-    lineHeight: 26,
-  },
-  bodyLarge: {
+  bodyPrimary: {
     fontFamily: 'Montserrat-Regular',
     fontSize: 16,
     lineHeight: 24,
+    letterSpacing: 0.2,
   },
-  button: {
+  buttonPrimary: {
     fontFamily: 'Montserrat-Bold',
-    fontSize: 18,
-    lineHeight: 24,
-    letterSpacing: 0.5,
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: 0.75,
   },
 };
 

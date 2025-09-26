@@ -6,10 +6,9 @@ import { colors } from '../../../styles/colors';
 
 export const BackgroundGlow: React.FC = () => {
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[styles.glow, styles.glowTopLeft]} />
-      <View style={[styles.glow, styles.glowBottomRight]} />
-      <View style={[styles.glow, styles.glowCenter]} />
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <View style={[styles.glow, styles.topGlow]} />
+      <View style={[styles.glow, styles.bottomGlow]} />
     </View>
   );
 };
@@ -18,27 +17,25 @@ const styles = StyleSheet.create({
   glow: {
     position: 'absolute',
     borderRadius: 999,
-    opacity: 0.28,
   },
-  glowTopLeft: {
-    width: 320,
-    height: 320,
-    backgroundColor: colors.accentCoral,
-    top: -120,
-    left: -120,
+  topGlow: {
+    width: 256,
+    height: 256,
+    backgroundColor: colors.glowCoral,
+    opacity: 0.5,
+    top: 0,
+    left: '50%',
+    marginLeft: -128,
+    marginTop: -128,
   },
-  glowBottomRight: {
-    width: 260,
-    height: 260,
-    backgroundColor: colors.accentSky,
-    bottom: -80,
-    right: -80,
-  },
-  glowCenter: {
-    width: 200,
-    height: 200,
-    backgroundColor: colors.accentSun,
-    top: '35%',
-    right: '15%',
+  bottomGlow: {
+    width: 288,
+    height: 288,
+    backgroundColor: colors.glowTeal,
+    opacity: 0.6,
+    bottom: 0,
+    right: '50%',
+    marginRight: -144,
+    marginBottom: -144,
   },
 });
