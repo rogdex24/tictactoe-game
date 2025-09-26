@@ -7,7 +7,7 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../../../styles/colors';
-import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
+import { layout, offsets, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
@@ -22,82 +22,56 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={styles.screen}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={colors.screenBackground} />
+      <BackgroundGlow />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.cardWrapper}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.card}
-          >
-            <BackgroundGlow />
-            <View style={styles.cardContent}>
-              <View style={styles.header}>
-                <Text style={[typography.displayHero, styles.title]}>Tic Tac{'\n'}Toe</Text>
-                <Text style={[typography.bodyPrimary, styles.subtitle]}>
-                  {"The classic game of X's and O's"}
-                </Text>
-              </View>
-              <View style={styles.iconStage}>
-                <GameIcons />
-              </View>
-              <View style={styles.ctaArea}>
-                <CustomButton label="Start Game" onPress={handleStart} />
-              </View>
-            </View>
-          </LinearGradient>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={[typography.displayHero, styles.title]}>Tic Tac{'\n'}Toe</Text>
+            <Text style={[typography.bodyPrimary, styles.subtitle]}>
+              {"The classic game of X's and O's"}
+            </Text>
+          </View>
+          <View style={styles.iconStage}>
+            <GameIcons />
+          </View>
+          <View style={styles.ctaArea}>
+            <CustomButton label="Start Game" onPress={handleStart} />
+          </View>
         </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 };
-
-const cardHeight = Math.min(
-  layout.screenHeight * layout.homeCardHeightRatio,
-  layout.homeCardMaxHeight,
-);
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.screenBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   safeArea: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
   },
-  cardWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  card: {
-    width: '100%',
-    maxWidth: layout.homeCardMaxWidth,
-    height: cardHeight,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    shadowColor: '#000000',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 24 },
-    shadowRadius: 60,
-    elevation: 24,
-    overflow: 'hidden',
-  },
-  cardContent: {
+  content: {
     flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingTop: spacing.hero,
+    paddingBottom: spacing.hero,
     justifyContent: 'space-between',
   },
   header: {
-    paddingTop: spacing.xl,
     alignItems: 'center',
     zIndex: 1,
   },
@@ -112,13 +86,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   iconStage: {
+    width: 192,
     height: 192,
     marginTop: offsets.homeGraphicLift,
+    alignSelf: 'center',
     position: 'relative',
     zIndex: 0,
   },
   ctaArea: {
-    paddingBottom: spacing.md,
+    width: '100%',
+    paddingTop: spacing.hero,
     zIndex: 1,
   },
 });

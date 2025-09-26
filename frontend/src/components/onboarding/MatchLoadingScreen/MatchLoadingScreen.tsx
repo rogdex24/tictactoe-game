@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlayerStore } from '../../../state/usePlayerStore';
 import { colors } from '../../../styles/colors';
-import { layout, radius, spacing } from '../../../styles/dimensions';
+import { layout, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
@@ -42,76 +42,51 @@ export const MatchLoadingScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={styles.screen}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={colors.screenBackground} />
+      <BackgroundGlow />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.cardWrapper}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={styles.card}
-          >
-            <BackgroundGlow />
-            <View style={styles.cardContent}>
-              <View style={styles.body}>
-                <LoadingSpinner />
-                <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
-                <Text style={[typography.bodyPrimary, styles.subtitle]}>
-                  Hang tight, {playerName || 'Player'}! We’ll seat you at the next open board.
-                </Text>
-              </View>
-              <View style={styles.footer}>
-                <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
-              </View>
-            </View>
-          </LinearGradient>
+        <View style={styles.content}>
+          <View style={styles.body}>
+            <LoadingSpinner />
+            <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
+            <Text style={[typography.bodyPrimary, styles.subtitle]}>
+              Hang tight, {playerName || 'Player'}! We’ll seat you at the next open board.
+            </Text>
+          </View>
+          <View style={styles.footer}>
+            <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
+          </View>
         </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 };
-
-const cardHeight = Math.min(
-  layout.screenHeight * layout.homeCardHeightRatio,
-  layout.homeCardMaxHeight,
-);
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.screenBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   safeArea: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
   },
-  cardWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  card: {
-    width: '100%',
-    maxWidth: layout.homeCardMaxWidth,
-    height: cardHeight,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    shadowColor: '#000000',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 24 },
-    shadowRadius: 60,
-    elevation: 24,
-    overflow: 'hidden',
-  },
-  cardContent: {
+  content: {
     flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingTop: spacing.hero,
+    paddingBottom: spacing.hero,
     justifyContent: 'space-between',
   },
   body: {
@@ -129,6 +104,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    paddingBottom: spacing.md,
+    width: '100%',
+    paddingTop: spacing.xl,
   },
 });

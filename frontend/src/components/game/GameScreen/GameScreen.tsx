@@ -9,17 +9,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlayerStore } from '../../../state/usePlayerStore';
 import { colors } from '../../../styles/colors';
-import { layout, radius, spacing } from '../../../styles/dimensions';
+import { layout, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 import { GameBoard } from '../GameBoard';
-
-const cardHeight = Math.min(
-  layout.screenHeight * layout.homeCardHeightRatio,
-  layout.homeCardMaxHeight,
-);
 
 const TurnIcon: React.FC = () => (
   <Svg height={32} viewBox="0 0 100 100" width={32}>
@@ -39,37 +34,33 @@ export const GameScreen: React.FC = () => {
   const displayName = playerName || 'Player';
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={styles.screen}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={colors.screenBackground} />
+      <BackgroundGlow />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.cardWrapper}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={styles.card}
-          >
-            <BackgroundGlow />
-            <View style={styles.cardContent}>
-              <View style={styles.header}>
-                <Text style={styles.matchupText}>{`${displayName} (YOU) vs. CPU (OPP)`}</Text>
-                <Text style={styles.scoreText}>3 - 2</Text>
-              </View>
-              <View style={styles.body}>
-                <View style={styles.turnIndicator}>
-                  <Text style={styles.turnLabel}>Your Turn</Text>
-                  <TurnIcon />
-                </View>
-                <GameBoard />
-              </View>
-              <View style={styles.footer}>
-                <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
-              </View>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.matchupText}>{`${displayName} (YOU) vs. CPU (OPP)`}</Text>
+            <Text style={styles.scoreText}>3 - 2</Text>
+          </View>
+          <View style={styles.body}>
+            <View style={styles.turnIndicator}>
+              <Text style={styles.turnLabel}>Your Turn</Text>
+              <TurnIcon />
             </View>
-          </LinearGradient>
+            <GameBoard />
+          </View>
+          <View style={styles.footer}>
+            <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
+          </View>
         </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -77,42 +68,26 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.screenBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   safeArea: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
   },
-  cardWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  card: {
-    width: '100%',
-    maxWidth: layout.homeCardMaxWidth,
-    height: cardHeight,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    shadowColor: '#000000',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 24 },
-    shadowRadius: 60,
-    elevation: 24,
-    overflow: 'hidden',
-  },
-  cardContent: {
+  content: {
     flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.hero,
+    paddingBottom: spacing.hero,
     justifyContent: 'space-between',
   },
   header: {
     alignItems: 'center',
-    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   matchupText: {
     fontFamily: typography.fontFamilyBold,
@@ -133,19 +108,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   turnIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   turnLabel: {
     fontFamily: typography.fontFamilyExtraBold,
     fontSize: 24,
     color: colors.accentMint,
+    marginRight: spacing.sm,
   },
   footer: {
-    paddingBottom: spacing.md,
+    width: '100%',
+    paddingTop: spacing.xl,
   },
 });

@@ -37,97 +37,73 @@ export const PlayerNameScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={styles.screen}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={colors.screenBackground} />
+      <BackgroundGlow />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.cardWrapper}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={styles.card}
-          >
-            <BackgroundGlow />
-            <View style={styles.cardContent}>
-              <View style={styles.headerRow}>
-                <BackButton onPress={handleBack} />
-              </View>
-              <View style={styles.body}>
-                <Text style={[typography.headingPrimary, styles.title]}>What’s your name?</Text>
-                <TextInput
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  autoCorrect={false}
-                  onChangeText={setName}
-                  placeholder="Enter your name"
-                  placeholderTextColor={colors.textSecondary}
-                  returnKeyType="done"
-                  selectionColor={colors.accentMint}
-                  style={styles.input}
-                  value={name}
-                />
-              </View>
-              <View style={styles.footer}>
-                <CustomButton label="Continue" onPress={handleContinue} />
-              </View>
-            </View>
-          </LinearGradient>
+        <View style={styles.content}>
+          <View style={styles.headerRow}>
+            <BackButton onPress={handleBack} />
+          </View>
+          <View style={styles.body}>
+            <Text style={[typography.headingPrimary, styles.title]}>What’s your name?</Text>
+            <TextInput
+              autoCapitalize="words"
+              autoComplete="name"
+              autoCorrect={false}
+              onChangeText={setName}
+              placeholder="Enter your name"
+              placeholderTextColor={colors.textSecondary}
+              returnKeyType="done"
+              selectionColor={colors.accentMint}
+              style={styles.input}
+              value={name}
+            />
+          </View>
+          <View style={styles.footer}>
+            <CustomButton label="Continue" onPress={handleContinue} />
+          </View>
         </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 };
-
-const cardHeight = Math.min(
-  layout.screenHeight * layout.homeCardHeightRatio,
-  layout.homeCardMaxHeight,
-);
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.screenBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   safeArea: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
   },
-  cardWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  card: {
-    width: '100%',
-    maxWidth: layout.homeCardMaxWidth,
-    height: cardHeight,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    shadowColor: '#000000',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 24 },
-    shadowRadius: 60,
-    elevation: 24,
-    overflow: 'hidden',
-  },
-  cardContent: {
+  content: {
     flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.hero,
     justifyContent: 'space-between',
   },
   headerRow: {
+    width: '100%',
     alignItems: 'flex-start',
   },
   body: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   title: {
     color: colors.textPrimary,
@@ -148,6 +124,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   footer: {
-    paddingTop: spacing.lg,
+    width: '100%',
+    paddingTop: spacing.xl,
   },
 });
