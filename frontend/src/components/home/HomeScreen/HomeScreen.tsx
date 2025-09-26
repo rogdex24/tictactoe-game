@@ -11,6 +11,7 @@ import { layout, offsets, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
+import { TextButton } from '../../common/TextButton';
 import { BackgroundGlow } from '../BackgroundGlow';
 import { GameIcons } from '../GameIcons';
 
@@ -19,6 +20,10 @@ export const HomeScreen: React.FC = () => {
 
   const handleStart = () => {
     navigation.navigate('PlayerName');
+  };
+
+  const handleLeaderboard = () => {
+    navigation.navigate('Leaderboard');
   };
 
   return (
@@ -43,6 +48,11 @@ export const HomeScreen: React.FC = () => {
           </View>
           <View style={styles.ctaArea}>
             <CustomButton label="Start Game" onPress={handleStart} />
+            <TextButton
+              label="View Leaderboard"
+              onPress={handleLeaderboard}
+              style={styles.leaderboardButton}
+            />
           </View>
         </View>
       </SafeAreaView>
@@ -97,5 +107,8 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingTop: spacing.hero,
     zIndex: 1,
+  },
+  leaderboardButton: {
+    marginTop: spacing.sm,
   },
 });

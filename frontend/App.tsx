@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { GameScreen } from './src/components/game/GameScreen';
 import { HomeScreen } from './src/components/home/HomeScreen';
+import { LeaderboardScreen } from './src/components/leaderboard/LeaderboardScreen';
 import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
 import { PlayerProvider } from './src/state/PlayerContext';
@@ -47,6 +48,7 @@ export default function App() {
             <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
             <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
             <Stack.Screen name="Game" component={GameScreen} />
+            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </PlayerProvider>

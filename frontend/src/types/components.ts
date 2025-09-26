@@ -3,6 +3,7 @@ export type RootStackParamList = {
   PlayerName: undefined;
   MatchLoading: undefined;
   Game: undefined;
+  Leaderboard: undefined;
 };
 
 export interface CtaButtonProps {
