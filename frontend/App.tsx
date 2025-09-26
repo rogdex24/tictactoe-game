@@ -2,52 +2,84 @@ import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import React from 'react';
 
-const Stack = createNativeStackNavigator();
+import { HomeScreen } from './src/components/home/HomeScreen';
+import { colors } from './src/styles/colors';
+import { spacing } from './src/styles/dimensions';
+import { typography } from './src/styles/typography';
+import type { RootStackParamList } from './src/types/components';
 
-function HomeScreen() {
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* noop - the splash screen might already be hidden */
+});
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const GameScreen: React.FC = () => {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.container}>
-        <Text style={styles.title}>Tic-Tac-Toe</Text>
-        <Text style={styles.subtitle}>Connect to Nakama to start playing!</Text>
+    <SafeAreaView style={styles.gameSafeArea}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.gameContainer}>
+        <Text style={styles.gameTitle}>Multiplayer Arena</Text>
+        <Text style={styles.gameSubtitle}>Matchmaking and gameplay coming soon.</Text>
       </View>
     </SafeAreaView>
   );
-}
+};
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'Montserrat-Regular': require('./assets/fonts/Montserrat-Regular.ttf'),
+    'Montserrat-Bold': require('./assets/fonts/Montserrat-Bold.ttf'),
+    'Montserrat-ExtraBold': require('./assets/fonts/Montserrat-ExtraBold.ttf'),
+  });
+
+  React.useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {
+        /* ignore */
+      });
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Game" component={GameScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  gameSafeArea: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.gradientEnd,
   },
-  container: {
+  gameContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xl,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#0f172a',
+  gameTitle: {
+    fontFamily: typography.fontFamilyExtraBold,
+    fontSize: 28,
+    color: colors.textPrimary,
   },
-  subtitle: {
-    marginTop: 12,
+  gameSubtitle: {
+    fontFamily: typography.fontFamilyRegular,
     fontSize: 16,
-    color: '#334155',
+    color: colors.textSecondary,
     textAlign: 'center',
+    marginTop: spacing.md,
   },
 });
