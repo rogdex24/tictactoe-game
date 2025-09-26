@@ -17,6 +17,7 @@ export const colors = {
   textPrimary: '#F8FAFC',
   textSecondary: 'rgba(248, 250, 252, 0.72)',
   textTealSoft: 'rgba(94, 234, 212, 0.7)',
+  textTealHighlight: 'rgba(94, 234, 212, 0.6)',
   textMuted: 'rgba(148, 163, 184, 0.85)',
   boardCell: 'rgba(22, 43, 58, 0.5)',
   boardCellActive: 'rgba(26, 58, 76, 0.6)',

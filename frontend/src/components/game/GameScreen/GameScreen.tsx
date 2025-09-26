@@ -45,7 +45,13 @@ export const GameScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.matchupText}>{`${displayName} (YOU) vs. CPU (OPP)`}</Text>
+            <View style={styles.matchupRow}>
+              <Text style={[styles.matchupText, styles.matchupName]}>{displayName}</Text>
+              <Text style={[styles.matchupText, styles.matchupAffiliation]}> (YOU)</Text>
+              <Text style={[styles.matchupText, styles.matchupSeparator]}> vs. </Text>
+              <Text style={[styles.matchupText, styles.matchupOpponent]}>CPU</Text>
+              <Text style={[styles.matchupText, styles.matchupAffiliation]}> (OPP)</Text>
+            </View>
             <Text style={styles.scoreText}>3 - 2</Text>
           </View>
           <View style={styles.body}>
@@ -89,12 +95,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: spacing.lg,
   },
+  matchupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   matchupText: {
     fontFamily: typography.fontFamilyBold,
     fontSize: 16,
     letterSpacing: 1.2,
-    color: colors.textSecondary,
     textTransform: 'uppercase',
+  },
+  matchupName: {
+    color: colors.textPrimary,
+  },
+  matchupAffiliation: {
+    color: colors.textTealHighlight,
+  },
+  matchupSeparator: {
+    color: colors.textSecondary,
+  },
+  matchupOpponent: {
+    color: colors.textPrimary,
   },
   scoreText: {
     fontFamily: typography.fontFamilyExtraBold,

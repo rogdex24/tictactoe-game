@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +17,10 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 export const PlayerNameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'PlayerName'>>();
   const { playerName, setPlayerName } = usePlayer();
   const [name, setName] = React.useState(playerName);
+  const nextScreen = route.params?.nextScreen ?? 'MatchLoading';
 
   React.useEffect(() => {
     setName(playerName);
@@ -33,7 +35,7 @@ export const PlayerNameScreen: React.FC = () => {
     const nextName = trimmedName.length > 0 ? trimmedName : 'Player';
 
     setPlayerName(nextName);
-    navigation.navigate('MatchLoading');
+    navigation.navigate(nextScreen);
   };
 
   return (
