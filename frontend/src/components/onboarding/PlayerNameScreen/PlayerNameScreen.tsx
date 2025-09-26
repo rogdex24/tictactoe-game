@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,18 +7,23 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../../../styles/colors';
-import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
+import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
+import { BackButton } from '../../common/BackButton';
 import { CustomButton } from '../../common/CustomButton';
-import { BackgroundGlow } from '../BackgroundGlow';
-import { GameIcons } from '../GameIcons';
+import { BackgroundGlow } from '../../home/BackgroundGlow';
 
-export const HomeScreen: React.FC = () => {
+export const PlayerNameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [name, setName] = React.useState('');
 
-  const handleStart = () => {
-    navigation.navigate('PlayerName');
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
+  const handleContinue = () => {
+    navigation.navigate('Game');
   };
 
   return (
@@ -28,23 +33,32 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.cardWrapper}>
           <LinearGradient
             colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
+            start={{ x: 0, y: 0 }}
             style={styles.card}
           >
             <BackgroundGlow />
             <View style={styles.cardContent}>
-              <View style={styles.header}>
-                <Text style={[typography.displayHero, styles.title]}>Tic Tac{'\n'}Toe</Text>
-                <Text style={[typography.bodyPrimary, styles.subtitle]}>
-                  {"The classic game of X's and O's"}
-                </Text>
+              <View style={styles.headerRow}>
+                <BackButton onPress={handleBack} />
               </View>
-              <View style={styles.iconStage}>
-                <GameIcons />
+              <View style={styles.body}>
+                <Text style={[typography.headingPrimary, styles.title]}>What’s your name?</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  autoCorrect={false}
+                  onChangeText={setName}
+                  placeholder="Enter your name"
+                  placeholderTextColor={colors.textSecondary}
+                  returnKeyType="done"
+                  selectionColor={colors.accentMint}
+                  style={styles.input}
+                  value={name}
+                />
               </View>
-              <View style={styles.ctaArea}>
-                <CustomButton label="Start Game" onPress={handleStart} />
+              <View style={styles.footer}>
+                <CustomButton label="Continue" onPress={handleContinue} />
               </View>
             </View>
           </LinearGradient>
@@ -96,29 +110,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     justifyContent: 'space-between',
   },
-  header: {
-    paddingTop: spacing.xl,
+  headerRow: {
+    alignItems: 'flex-start',
+  },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
+    paddingHorizontal: spacing.md,
   },
   title: {
     color: colors.textPrimary,
     textAlign: 'center',
-    letterSpacing: 1.5,
   },
-  subtitle: {
-    color: colors.textTealSoft,
-    marginTop: spacing.xs,
-    textAlign: 'center',
+  input: {
+    marginTop: spacing.xl,
+    alignSelf: 'stretch',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surfaceOverlay,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamilyRegular,
+    fontSize: 18,
+    lineHeight: 24,
   },
-  iconStage: {
-    height: 192,
-    marginTop: offsets.homeGraphicLift,
-    position: 'relative',
-    zIndex: 0,
-  },
-  ctaArea: {
-    paddingBottom: spacing.md,
-    zIndex: 1,
+  footer: {
+    paddingTop: spacing.lg,
   },
 });

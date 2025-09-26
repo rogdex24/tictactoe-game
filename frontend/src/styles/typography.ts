@@ -8,6 +8,12 @@ export const typography = {
     lineHeight: 96,
     letterSpacing: 0.5,
   },
+  headingPrimary: {
+    fontFamily: 'Montserrat-ExtraBold',
+    fontSize: 36,
+    lineHeight: 44,
+    letterSpacing: 0.5,
+  },
   bodyPrimary: {
     fontFamily: 'Montserrat-Regular',
     fontSize: 16,
