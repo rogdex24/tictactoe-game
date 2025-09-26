@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Home: undefined;
   PlayerName: undefined;
+  MatchLoading: undefined;
   Game: undefined;
 };
 

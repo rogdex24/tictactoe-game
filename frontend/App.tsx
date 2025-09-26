@@ -8,6 +8,7 @@ import React from 'react';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { HomeScreen } from './src/components/home/HomeScreen';
+import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
 import { colors } from './src/styles/colors';
 import { spacing } from './src/styles/dimensions';
@@ -57,6 +58,7 @@ export default function App() {
         <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
+          <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
         </Stack.Navigator>
       </NavigationContainer>

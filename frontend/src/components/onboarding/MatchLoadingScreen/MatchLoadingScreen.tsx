@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,20 +10,15 @@ import { colors } from '../../../styles/colors';
 import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
-import { BackButton } from '../../common/BackButton';
 import { CustomButton } from '../../common/CustomButton';
+import { LoadingSpinner } from '../../common/LoadingSpinner';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 
-export const PlayerNameScreen: React.FC = () => {
+export const MatchLoadingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [name, setName] = React.useState('');
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const handleContinue = () => {
-    navigation.navigate('MatchLoading');
+  const handleCancel = () => {
+    navigation.navigate('Home');
   };
 
   return (
@@ -39,26 +34,13 @@ export const PlayerNameScreen: React.FC = () => {
           >
             <BackgroundGlow />
             <View style={styles.cardContent}>
-              <View style={styles.headerRow}>
-                <BackButton onPress={handleBack} />
-              </View>
               <View style={styles.body}>
-                <Text style={[typography.headingPrimary, styles.title]}>What’s your name?</Text>
-                <TextInput
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  autoCorrect={false}
-                  onChangeText={setName}
-                  placeholder="Enter your name"
-                  placeholderTextColor={colors.textSecondary}
-                  returnKeyType="done"
-                  selectionColor={colors.accentMint}
-                  style={styles.input}
-                  value={name}
-                />
+                <LoadingSpinner />
+                <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
+                <Text style={[typography.bodyPrimary, styles.subtitle]}>Please wait a moment.</Text>
               </View>
               <View style={styles.footer}>
-                <CustomButton label="Continue" onPress={handleContinue} />
+                <CustomButton label="Cancel" onPress={handleCancel} variant="secondary" />
               </View>
             </View>
           </LinearGradient>
@@ -110,34 +92,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     justifyContent: 'space-between',
   },
-  headerRow: {
-    alignItems: 'flex-start',
-  },
   body: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
   },
   title: {
     color: colors.textPrimary,
     textAlign: 'center',
   },
-  input: {
-    marginTop: spacing.xl,
-    alignSelf: 'stretch',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.surfaceOverlay,
-    color: colors.textPrimary,
-    fontFamily: typography.fontFamilyRegular,
-    fontSize: 18,
-    lineHeight: 24,
+  subtitle: {
+    color: colors.textTealSoft,
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
   footer: {
-    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
 });
