@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,34 +13,30 @@ import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
-import { LoadingSpinner } from '../../common/LoadingSpinner';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
+import { GameBoard } from '../GameBoard';
 
-export const MatchLoadingScreen: React.FC = () => {
+const cardHeight = Math.min(
+  layout.screenHeight * layout.homeCardHeightRatio,
+  layout.homeCardMaxHeight,
+);
+
+const TurnIcon: React.FC = () => (
+  <Svg height={32} viewBox="0 0 100 100" width={32}>
+    <Path d="M20 20 L80 80" stroke={colors.accentMint} strokeLinecap="round" strokeWidth={12} />
+    <Path d="M80 20 L20 80" stroke={colors.accentMint} strokeLinecap="round" strokeWidth={12} />
+  </Svg>
+);
+
+export const GameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayerStore();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCancel = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    navigation.navigate('Home');
+  const handleLeaveGame = () => {
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
-  React.useEffect(() => {
-    timeoutRef.current = setTimeout(() => {
-      navigation.navigate('Game');
-    }, 3000);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [navigation]);
+  const displayName = playerName || 'Player';
 
   return (
     <View style={styles.screen}>
@@ -54,15 +51,19 @@ export const MatchLoadingScreen: React.FC = () => {
           >
             <BackgroundGlow />
             <View style={styles.cardContent}>
+              <View style={styles.header}>
+                <Text style={styles.matchupText}>{`${displayName} (YOU) vs. CPU (OPP)`}</Text>
+                <Text style={styles.scoreText}>3 - 2</Text>
+              </View>
               <View style={styles.body}>
-                <LoadingSpinner />
-                <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
-                <Text style={[typography.bodyPrimary, styles.subtitle]}>
-                  Hang tight, {playerName || 'Player'}! We’ll seat you at the next open board.
-                </Text>
+                <View style={styles.turnIndicator}>
+                  <Text style={styles.turnLabel}>Your Turn</Text>
+                  <TurnIcon />
+                </View>
+                <GameBoard />
               </View>
               <View style={styles.footer}>
-                <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
+                <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
               </View>
             </View>
           </LinearGradient>
@@ -71,11 +72,6 @@ export const MatchLoadingScreen: React.FC = () => {
     </View>
   );
 };
-
-const cardHeight = Math.min(
-  layout.screenHeight * layout.homeCardHeightRatio,
-  layout.homeCardMaxHeight,
-);
 
 const styles = StyleSheet.create({
   screen: {
@@ -111,22 +107,43 @@ const styles = StyleSheet.create({
   cardContent: {
     flex: 1,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.lg,
     justifyContent: 'space-between',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: spacing.lg,
+  },
+  matchupText: {
+    fontFamily: typography.fontFamilyBold,
+    fontSize: 16,
+    letterSpacing: 1.2,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  scoreText: {
+    fontFamily: typography.fontFamilyExtraBold,
+    fontSize: 48,
+    lineHeight: 52,
+    letterSpacing: 6,
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
   },
   body: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.lg,
   },
-  title: {
-    color: colors.textPrimary,
-    textAlign: 'center',
+  turnIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  subtitle: {
-    color: colors.textTealSoft,
-    marginTop: spacing.sm,
-    textAlign: 'center',
+  turnLabel: {
+    fontFamily: typography.fontFamilyExtraBold,
+    fontSize: 24,
+    color: colors.accentMint,
   },
   footer: {
     paddingBottom: spacing.md,

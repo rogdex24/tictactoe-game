@@ -1,18 +1,15 @@
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { GameScreen } from './src/components/game/GameScreen';
 import { HomeScreen } from './src/components/home/HomeScreen';
 import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
-import { colors } from './src/styles/colors';
-import { spacing } from './src/styles/dimensions';
-import { typography } from './src/styles/typography';
 import type { RootStackParamList } from './src/types/components';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -20,18 +17,6 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
-const GameScreen: React.FC = () => {
-  return (
-    <SafeAreaView style={styles.gameSafeArea}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.gameContainer}>
-        <Text style={styles.gameTitle}>Multiplayer Arena</Text>
-        <Text style={styles.gameSubtitle}>Matchmaking and gameplay coming soon.</Text>
-      </View>
-    </SafeAreaView>
-  );
-};
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -65,28 +50,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  gameSafeArea: {
-    flex: 1,
-    backgroundColor: colors.gradientEnd,
-  },
-  gameContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  gameTitle: {
-    fontFamily: typography.fontFamilyExtraBold,
-    fontSize: 28,
-    color: colors.textPrimary,
-  },
-  gameSubtitle: {
-    fontFamily: typography.fontFamilyRegular,
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.md,
-  },
-});

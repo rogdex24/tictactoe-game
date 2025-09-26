@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { usePlayerStore } from '../../../state/usePlayerStore';
 import { colors } from '../../../styles/colors';
 import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
@@ -16,13 +17,22 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 export const PlayerNameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [name, setName] = React.useState('');
+  const { playerName, setPlayerName } = usePlayerStore();
+  const [name, setName] = React.useState(playerName);
+
+  React.useEffect(() => {
+    setName(playerName);
+  }, [playerName]);
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleContinue = () => {
+    const trimmedName = name.trim();
+    const nextName = trimmedName.length > 0 ? trimmedName : 'Player';
+
+    setPlayerName(nextName);
     navigation.navigate('MatchLoading');
   };
 
