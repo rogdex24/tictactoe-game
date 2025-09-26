@@ -18,7 +18,7 @@ import { GameBoard, GameSymbol } from '../GameBoard';
 
 type PlayerMark = 'X' | 'O';
 
-type GameState = 'PLAYING' | 'WON' | 'DRAW';
+type GameState = 'PLAYING' | 'WON' | 'DRAW' | 'LOSE';
 
 const WINNING_COMBINATIONS: Array<[number, number, number]> = [
   [0, 1, 2],
@@ -77,6 +77,11 @@ export const GameScreen: React.FC = () => {
     resetGame();
   }, [resetGame]);
 
+  const handleLeaveGame = useCallback(() => {
+    resetGame();
+    navigation.navigate('Home');
+  }, [navigation, resetGame]);
+
   useEffect(() => {
     resetGame();
   }, [resetGame]);
@@ -100,7 +105,7 @@ export const GameScreen: React.FC = () => {
       const { winner: roundWinner, line } = evaluateBoard(nextBoard);
 
       if (roundWinner) {
-        setGameState('WON');
+        setGameState(roundWinner === 'X' ? 'WON' : 'LOSE');
         setWinner(roundWinner);
         setWinningCells(line);
         const winnerName = roundWinner === 'X' ? displayName : opponentName;
@@ -123,7 +128,7 @@ export const GameScreen: React.FC = () => {
   const boardDisabled = gameState !== 'PLAYING';
 
   const activeSymbol = useMemo<PlayerMark>(() => {
-    if (gameState === 'WON' && winner) {
+    if ((gameState === 'WON' || gameState === 'LOSE') && winner) {
       return winner;
     }
 
@@ -135,12 +140,18 @@ export const GameScreen: React.FC = () => {
       return winner === 'X' ? colors.accentMint : colors.accentTealSoft;
     }
 
+    if (gameState === 'LOSE') {
+      return colors.accentDanger;
+    }
+
     if (gameState === 'DRAW') {
       return colors.accentDraw;
     }
 
     return currentPlayer === 'X' ? colors.accentMint : colors.textTealHighlight;
   }, [currentPlayer, gameState, winner]);
+
+  const isGameComplete = gameState === 'WON' || gameState === 'LOSE' || gameState === 'DRAW';
 
   return (
     <LinearGradient
@@ -178,12 +189,18 @@ export const GameScreen: React.FC = () => {
             />
           </View>
           <View style={styles.footer}>
-            <CustomButton label="Play Again" onPress={handlePlayAgain} />
-            <TextButton
-              label="View Leaderboard"
-              onPress={handleLeaderboard}
-              style={styles.leaderboardButton}
-            />
+            {isGameComplete ? (
+              <>
+                <CustomButton label="Play Again" onPress={handlePlayAgain} />
+                <TextButton
+                  label="View Leaderboard"
+                  onPress={handleLeaderboard}
+                  style={styles.leaderboardButton}
+                />
+              </>
+            ) : (
+              <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
+            )}
           </View>
         </View>
       </SafeAreaView>
