@@ -1,0 +1,22 @@
+export const colors = {
+  screenBackground: '#0F172A',
+  gradientStart: '#1A3A4C',
+  gradientEnd: '#122B3A',
+  accentCoral: '#F06C64',
+  accentSky: '#38BDF8',
+  accentSun: '#FACC15',
+  accentMint: '#34D399',
+  textPrimary: '#F8FAFC',
+  textSecondary: 'rgba(248, 250, 252, 0.72)',
+  textTealSoft: 'rgba(94, 234, 212, 0.7)',
+  surfacePrimary: '#F8FAFC',
+  surfaceSecondary: '#E2E8F0',
+  surfaceOverlay: 'rgba(15, 23, 42, 0.32)',
+  shadow: 'rgba(8, 47, 73, 0.45)',
+  buttonShadow: 'rgba(240, 108, 100, 0.4)',
+  borderSubtle: 'rgba(255, 255, 255, 0.1)',
+  glowCoral: 'rgba(240, 108, 100, 0.2)',
+  glowTeal: 'rgba(20, 184, 166, 0.1)',
+};
+
+export type ColorName = keyof typeof colors;

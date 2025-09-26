@@ -4,7 +4,15 @@ module.exports = {
     project: ['./tsconfig.json'],
   },
   settings: {
-    'import/core-modules': ['react-native'],
+    'import/core-modules': [
+      'react-native',
+      'expo',
+      'expo-font',
+      'expo-splash-screen',
+      'expo-linear-gradient',
+      'react-native-linear-gradient',
+      'react-native-svg',
+    ],
   },
   overrides: [
     {
