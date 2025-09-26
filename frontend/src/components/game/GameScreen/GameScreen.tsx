@@ -12,6 +12,7 @@ import { layout, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
+import { TextButton } from '../../common/TextButton';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 import { GameBoard, GameSymbol } from '../GameBoard';
 
@@ -49,12 +50,12 @@ const isBoardFull = (cells: (PlayerMark | null)[]) => cells.every((cell) => cell
 export const GameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
-
-  const handleLeaveGame = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  };
-
   const displayName = playerName || 'Player';
+  const opponentName = 'CPU';
+
+  const handleLeaderboard = useCallback(() => {
+    navigation.navigate('Leaderboard');
+  }, [navigation]);
 
   const [board, setBoard] = useState<(PlayerMark | null)[]>(Array(9).fill(null));
   const [currentPlayer, setCurrentPlayer] = useState<PlayerMark>('X');
@@ -71,6 +72,10 @@ export const GameScreen: React.FC = () => {
     setWinningCells(null);
     setStatusMessage('Your Turn');
   }, []);
+
+  const handlePlayAgain = useCallback(() => {
+    resetGame();
+  }, [resetGame]);
 
   useEffect(() => {
     resetGame();
@@ -98,7 +103,8 @@ export const GameScreen: React.FC = () => {
         setGameState('WON');
         setWinner(roundWinner);
         setWinningCells(line);
-        setStatusMessage(`${roundWinner} Wins!`);
+        const winnerName = roundWinner === 'X' ? displayName : opponentName;
+        setStatusMessage(`${winnerName} (${roundWinner}) Wins!`);
         return;
       }
 
@@ -111,7 +117,7 @@ export const GameScreen: React.FC = () => {
 
       setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
     },
-    [board, currentPlayer, gameState],
+    [board, currentPlayer, gameState, displayName, opponentName],
   );
 
   const boardDisabled = gameState !== 'PLAYING';
@@ -152,7 +158,7 @@ export const GameScreen: React.FC = () => {
               <Text style={[styles.matchupText, styles.matchupName]}>{displayName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (YOU)</Text>
               <Text style={[styles.matchupText, styles.matchupSeparator]}> vs. </Text>
-              <Text style={[styles.matchupText, styles.matchupOpponent]}>CPU</Text>
+              <Text style={[styles.matchupText, styles.matchupOpponent]}>{opponentName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (OPP)</Text>
             </View>
             <Text style={styles.scoreText}>3 - 2</Text>
@@ -172,7 +178,12 @@ export const GameScreen: React.FC = () => {
             />
           </View>
           <View style={styles.footer}>
-            <CustomButton label="Leave Game" onPress={handleLeaveGame} variant="danger" />
+            <CustomButton label="Play Again" onPress={handlePlayAgain} />
+            <TextButton
+              label="View Leaderboard"
+              onPress={handleLeaderboard}
+              style={styles.leaderboardButton}
+            />
           </View>
         </View>
       </SafeAreaView>
@@ -259,5 +270,8 @@ const styles = StyleSheet.create({
   footer: {
     width: '100%',
     paddingTop: spacing.lg,
+  },
+  leaderboardButton: {
+    marginTop: spacing.sm,
   },
 });
