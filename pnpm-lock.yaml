@@ -64,8 +64,8 @@ importers:
         specifier: ~14.0.8
         version: 14.0.8(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       expo-linear-gradient:
-        specifier: ~13.0.2
-        version: 13.0.2(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))
+        specifier: ~15.0.7
+        version: 15.0.7(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       expo-secure-store:
         specifier: ^15.0.7
         version: 15.0.7(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))
@@ -4023,13 +4023,17 @@ packages:
       expo: '*'
       react: '*'
 
-  expo-linear-gradient@13.0.2:
+  expo-linear-gradient@15.0.7:
     resolution:
       {
-        integrity: sha512-EDcILUjRKu4P1rtWcwciN6CSyGtH7Bq4ll3oTRV7h3h8oSzSilH1g6z7kTAMlacPBKvMnkkWOGzW6KtgMKEiTg==,
+        integrity: sha512-8gmtYFyYlp4qv+ZdGVmE9oS9K+omZEFiPrEktsJ5drC6WSa2XOgJZgS3xrIP9+kFVF4Y6uJjPpcWBTCPI2YcHA==,
       }
     peerDependencies:
       expo: '*'
+      react-native: '*'
+    dependencies:
+      react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0)
 
   expo-modules-autolinking@3.0.13:
     resolution:
@@ -11975,9 +11979,11 @@ snapshots:
       expo: 54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       react: 19.1.0
 
-  expo-linear-gradient@13.0.2(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)):
+  expo-linear-gradient@15.0.7(expo@54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0):
     dependencies:
       expo: 54.0.10(@babel/core@7.28.4)(graphql@15.8.0)(react-native@0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
+      react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.28.4)(@react-native-community/cli@12.3.7)(@types/react@19.1.13)(react@19.1.0)
 
   expo-modules-autolinking@3.0.13:
     dependencies:
