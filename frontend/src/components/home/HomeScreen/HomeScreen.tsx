@@ -55,9 +55,8 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.topSection}>
             {hasPlayerName && (
               <View style={styles.greetingRow}>
-                <Text
-                  style={[typography.bodyPrimary, styles.greetingText]}
-                >{`Hi, ${trimmedName}`}</Text>
+                <Text style={[typography.bodyPrimary, styles.greetingIntro]}>Hi,</Text>
+                <Text style={[typography.bodyPrimary, styles.greetingName]}>{trimmedName}</Text>
                 <IconButton
                   accessibilityLabel="Edit name"
                   icon={<EditIcon />}
@@ -94,7 +93,7 @@ const EditIcon: React.FC = () => (
   <Svg height={20} viewBox="0 0 24 24" width={20}>
     <Path
       d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm18-11.49a1 1 0 0 0 0-1.41l-1.59-1.59a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.08-1.08Z"
-      fill={colors.textSecondary}
+      fill={colors.textTealSoft}
     />
   </Svg>
 );
@@ -115,7 +114,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.hero,
     paddingBottom: spacing.hero,
     justifyContent: 'space-between',
@@ -130,11 +129,18 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: spacing.lg,
   },
-  greetingText: {
+  greetingIntro: {
     color: colors.textSecondary,
+    marginRight: spacing.xs / 2,
+  },
+  greetingName: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamilyBold,
   },
   editButton: {
     marginLeft: spacing.xs,
+    width: 36,
+    height: 36,
   },
   header: {
     alignItems: 'center',
@@ -160,7 +166,7 @@ const styles = StyleSheet.create({
   },
   ctaArea: {
     width: '100%',
-    paddingTop: spacing.hero,
+    paddingTop: spacing.xl,
     zIndex: 1,
   },
   leaderboardButton: {

@@ -53,11 +53,12 @@ export const MatchLoadingScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.body}>
+            <Text
+              style={[typography.bodyPrimary, styles.greeting]}
+            >{`Hi, ${playerName || 'Player'}!`}</Text>
             <LoadingSpinner />
             <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
-            <Text style={[typography.bodyPrimary, styles.subtitle]}>
-              Hang tight, {playerName || 'Player'}! We’ll seat you at the next open board.
-            </Text>
+            <Text style={[typography.bodyPrimary, styles.subtitle]}>Please wait a moment.</Text>
           </View>
           <View style={styles.footer}>
             <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.hero,
     paddingBottom: spacing.hero,
     justifyContent: 'space-between',
@@ -93,6 +94,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  greeting: {
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
   },
   title: {
     color: colors.textPrimary,
@@ -105,6 +111,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     width: '100%',
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
 });

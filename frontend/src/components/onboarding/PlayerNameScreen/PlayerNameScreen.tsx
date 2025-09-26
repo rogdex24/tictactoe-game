@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.hero,
     justifyContent: 'space-between',
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   title: {
     color: colors.textPrimary,
@@ -127,6 +127,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     width: '100%',
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
 });

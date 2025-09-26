@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.hero,
     paddingBottom: spacing.hero,
     justifyContent: 'space-between',
@@ -144,6 +144,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     width: '100%',
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
 });

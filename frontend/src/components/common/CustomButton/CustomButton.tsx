@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   primary: {
-    backgroundColor: colors.accentCoral,
+    backgroundColor: colors.accentTeal,
     shadowColor: colors.buttonShadow,
     shadowOpacity: 1,
     shadowRadius: 16,
@@ -81,13 +81,13 @@ const styles = StyleSheet.create({
   secondary: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: colors.accentCoralBorder,
+    borderColor: colors.accentTealBorder,
   },
   secondaryPressed: {
-    backgroundColor: colors.accentCoralOverlay,
+    backgroundColor: colors.accentTealOverlay,
   },
   secondaryLabel: {
-    color: colors.accentCoralSoft,
+    color: colors.accentTealSoft,
   },
   danger: {
     backgroundColor: 'transparent',

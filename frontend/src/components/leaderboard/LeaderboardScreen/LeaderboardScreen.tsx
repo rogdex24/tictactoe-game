@@ -65,9 +65,10 @@ const LEADERBOARD_DATA: LeaderboardEntry[] = [
   },
 ];
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry }> = ({ entry }) => {
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number }> = ({ entry, index }) => {
   return (
     <View style={styles.row}>
+      <Text style={styles.rankCell}>{index + 1}</Text>
       <Text numberOfLines={1} style={styles.playerCell}>
         {entry.player}
       </Text>
@@ -95,8 +96,8 @@ export const LeaderboardScreen: React.FC = () => {
     navigation.navigate('Home');
   };
 
-  const renderItem: ListRenderItem<LeaderboardEntry> = ({ item }) => (
-    <LeaderboardRow entry={item} />
+  const renderItem: ListRenderItem<LeaderboardEntry> = ({ item, index }) => (
+    <LeaderboardRow entry={item} index={index} />
   );
 
   return (
@@ -117,6 +118,7 @@ export const LeaderboardScreen: React.FC = () => {
           </View>
           <View style={styles.tableWrapper}>
             <View style={styles.tableHeader}>
+              <Text style={[styles.headerCell, styles.rankHeader]}>#</Text>
               <Text style={[styles.headerCell, styles.playerHeader]}>PLAYER</Text>
               <Text style={[styles.headerCell, styles.recordHeader]}>W/L/D</Text>
               <Text style={[styles.headerCell, styles.timeHeader]}>TIME</Text>
@@ -156,7 +158,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.hero,
   },
@@ -190,6 +192,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyBold,
     color: colors.textTealSoft,
   },
+  rankHeader: {
+    flex: 1,
+    textAlign: 'center',
+  },
   playerHeader: {
     flex: 4,
   },
@@ -202,14 +208,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scoreHeader: {
-    flex: 3,
+    flex: 2,
     textAlign: 'right',
   },
   list: {
     marginTop: spacing.sm,
   },
   listContent: {
-    paddingRight: spacing.xs,
+    paddingRight: spacing.sm,
     paddingBottom: spacing.xl,
   },
   row: {
@@ -220,6 +226,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
+  },
+  rankCell: {
+    flex: 1,
+    ...typography.bodyPrimary,
+    fontFamily: typography.fontFamilyBold,
+    textAlign: 'center',
+    color: colors.accentTealSoft,
   },
   playerCell: {
     flex: 4,
@@ -241,7 +254,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   scoreCell: {
-    flex: 3,
+    flex: 2,
     ...typography.bodyPrimary,
     fontFamily: typography.fontFamilyBold,
     textAlign: 'right',
