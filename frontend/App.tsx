@@ -10,6 +10,7 @@ import { GameScreen } from './src/components/game/GameScreen';
 import { HomeScreen } from './src/components/home/HomeScreen';
 import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
+import { PlayerProvider } from './src/state/PlayerContext';
 import type { RootStackParamList } from './src/types/components';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -39,14 +40,16 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
-          <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
-          <Stack.Screen name="Game" component={GameScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <PlayerProvider>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
+            <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
+            <Stack.Screen name="Game" component={GameScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PlayerProvider>
     </SafeAreaProvider>
   );
 }

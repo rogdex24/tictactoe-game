@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { usePlayerStore } from '../../../state/usePlayerStore';
+import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
@@ -17,7 +17,7 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 export const MatchLoadingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { playerName } = usePlayerStore();
+  const { playerName } = usePlayer();
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCancel = () => {
