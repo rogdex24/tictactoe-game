@@ -25,29 +25,53 @@ export const MatchLoadingScreen: React.FC = () => {
     useMatch();
 
   const [hasPromptedError, setHasPromptedError] = React.useState(false);
+  const matchmakingAttemptRef = React.useRef<Promise<void> | null>(null);
 
   const startMatchmaking = React.useCallback(async () => {
-    try {
-      await ensureAuthenticated();
-      await beginMatchmaking('classic');
-    } catch (authError) {
-      console.error('Failed to authenticate before matchmaking:', authError);
-      Alert.alert(
-        'Authentication Required',
-        'Unable to connect to game servers. Please try again.',
-        [
-          {
-            text: 'Retry',
-            onPress: startMatchmaking,
-          },
-          {
-            text: 'Go Back',
-            style: 'cancel',
-            onPress: () => navigation.navigate('Home'),
-          },
-        ],
+    if (matchmakingAttemptRef.current) {
+      console.debug(
+        'MatchLoadingScreen: matchmaking attempt already running, ignoring new request',
       );
+      return matchmakingAttemptRef.current;
     }
+
+    const attempt = (async () => {
+      try {
+        console.debug('MatchLoadingScreen: ensuring authentication before matchmaking');
+        await ensureAuthenticated();
+        console.debug('MatchLoadingScreen: authentication ready, beginning matchmaking');
+        await beginMatchmaking('classic');
+      } catch (authError) {
+        console.error('Failed to authenticate before matchmaking:', authError);
+        Alert.alert(
+          'Authentication Required',
+          'Unable to connect to game servers. Please try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: () => {
+                matchmakingAttemptRef.current = null;
+                startMatchmaking();
+              },
+            },
+            {
+              text: 'Go Back',
+              style: 'cancel',
+              onPress: () => navigation.navigate('Home'),
+            },
+          ],
+        );
+      }
+    })();
+
+    matchmakingAttemptRef.current = attempt;
+    try {
+      await attempt;
+    } finally {
+      matchmakingAttemptRef.current = null;
+    }
+
+    return attempt;
   }, [beginMatchmaking, ensureAuthenticated, navigation]);
 
   React.useEffect(() => {
@@ -56,6 +80,7 @@ export const MatchLoadingScreen: React.FC = () => {
     }
 
     return () => {
+      matchmakingAttemptRef.current = null;
       cancelMatchmaking().catch((cancelError) => {
         console.warn('Failed to cancel matchmaking on cleanup', cancelError);
       });
@@ -89,6 +114,7 @@ export const MatchLoadingScreen: React.FC = () => {
   }, [matchId, matchState.phase, navigation]);
 
   const handleCancel = React.useCallback(() => {
+    matchmakingAttemptRef.current = null;
     Promise.all([cancelMatchmaking(), leaveMatch()]).finally(() => {
       navigation.navigate('Home');
     });

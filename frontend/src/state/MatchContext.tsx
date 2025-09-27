@@ -2,7 +2,13 @@ import type { MatchData, MatchmakerMatched, Socket } from '@heroiclabs/nakama-js
 import React from 'react';
 
 import { nakamaService } from '../services/nakama';
-import type { MatchMode, MatchPlayerState, MatchStatePayload, MatchStateView, PlayerMark } from '../types/match';
+import type {
+  MatchMode,
+  MatchPlayerState,
+  MatchStatePayload,
+  MatchStateView,
+  PlayerMark,
+} from '../types/match';
 
 import { usePlayer } from './PlayerContext';
 
@@ -33,13 +39,13 @@ const decodePayload = (data?: Uint8Array): MatchStatePayload | null => {
 };
 
 const transformState = (payload: MatchStatePayload): MatchStateView => {
-  const board = payload.board.map((cell) => (cell === 'X' || cell === 'O' ? cell : null)) as Array<
-    PlayerMark | null
-  >;
+  const board = payload.board.map((cell) =>
+    cell === 'X' || cell === 'O' ? cell : null,
+  ) as Array<PlayerMark | null>;
 
   const winner = payload.winner && payload.winner.length > 0 ? payload.winner : null;
   const players = payload.players ?? {};
-  const inferredWinnerMark = winner ? players[winner]?.mark ?? null : null;
+  const inferredWinnerMark = winner ? (players[winner]?.mark ?? null) : null;
 
   return {
     mode: payload.mode,
@@ -97,6 +103,7 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
   }, []);
 
   const socketRef = React.useRef<Socket | null>(null);
+  const matchmakingInFlightRef = React.useRef<Promise<void> | null>(null);
 
   const resetMatchState = React.useCallback(() => {
     setMatchState(null);
@@ -137,6 +144,11 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
       const transformed = transformState(payload);
       setMatchState(transformed);
       setMode(transformed.mode);
+      console.debug('MatchContext: processed match data payload', {
+        opCode: message.op_code,
+        phase: transformed.phase,
+        moveNumber: transformed.moveNumber,
+      });
 
       if (playerId) {
         const playerState = transformed.players[playerId];
@@ -156,6 +168,9 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
       setTicket(null);
       setMatchId(matched.match_id);
       setError(null);
+      console.debug('MatchContext: received matchmaker matched event', {
+        matchId: matched.match_id,
+      });
 
       try {
         setStatus('joining');
@@ -175,51 +190,114 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
         throw new Error('Authentication required before matchmaking.');
       }
 
-      setError(null);
-      setStatus('searching');
-      setMode(matchMode);
-      setMatchState(null);
-      setPlayerMark(null);
-      setMatchId(null);
+      if (matchmakingInFlightRef.current) {
+        console.debug('MatchContext: matchmaking already in flight, ignoring duplicate request', {
+          mode: matchMode,
+          status,
+          activeTicket: ticketRef.current,
+        });
+        return matchmakingInFlightRef.current;
+      }
 
-      try {
-        const socket = await nakamaService.connectSocket();
-        socketRef.current = socket;
+      const matchmakingPromise = (async () => {
+        console.debug('MatchContext: starting matchmaking request', {
+          mode: matchMode,
+          previousStatus: status,
+          existingTicket: ticketRef.current,
+        });
 
-        const existingDisconnect = socket.ondisconnect;
-        socket.ondisconnect = (event) => {
-          if (typeof existingDisconnect === 'function') {
-            existingDisconnect(event);
+        setError(null);
+        setStatus('searching');
+        setMode(matchMode);
+        setMatchState(null);
+        setPlayerMark(null);
+        setMatchId(null);
+
+        if (ticketRef.current) {
+          const staleTicket = ticketRef.current;
+          console.debug('MatchContext: removing stale matchmaking ticket before requeueing', {
+            ticket: staleTicket,
+          });
+          try {
+            await nakamaService.removeMatchmaker(staleTicket);
+          } catch (removeError) {
+            console.warn('MatchContext: failed to remove stale matchmaking ticket', removeError);
+          } finally {
+            setTicket(null);
           }
-          socketRef.current = null;
-          resetMatchState();
-          setTicket(null);
-          setStatus('idle');
-        };
+        }
 
-        socket.onmatchmakermatched = handleMatchmakerMatched;
-        socket.onmatchdata = handleMatchData;
+        try {
+          const socket = await nakamaService.connectSocket();
+          socketRef.current = socket;
 
-        const ticket = await nakamaService.addMatchmaker(matchMode);
-        setTicket(ticket.ticket);
-      } catch (matchmakingError) {
-        console.error('Failed to begin matchmaking', matchmakingError);
-        setError('Unable to start matchmaking. Please try again.');
-        setStatus('error');
+          const existingDisconnect = socket.ondisconnect;
+          socket.ondisconnect = (event) => {
+            if (typeof existingDisconnect === 'function') {
+              existingDisconnect(event);
+            }
+            console.debug('MatchContext: socket disconnected during matchmaking', {
+              mode: matchMode,
+            });
+            socketRef.current = null;
+            resetMatchState();
+            setTicket(null);
+            setStatus('idle');
+          };
+
+          socket.onmatchmakermatched = handleMatchmakerMatched;
+          socket.onmatchdata = handleMatchData;
+
+          const ticket = await nakamaService.addMatchmaker(matchMode);
+          console.debug('MatchContext: matchmaking ticket acquired', {
+            mode: matchMode,
+            ticket: ticket.ticket,
+          });
+          setTicket(ticket.ticket);
+        } catch (matchmakingError) {
+          console.error('Failed to begin matchmaking', matchmakingError);
+          setError('Unable to start matchmaking. Please try again.');
+          setStatus('error');
+        }
+      })();
+
+      matchmakingInFlightRef.current = matchmakingPromise;
+      try {
+        await matchmakingPromise;
+      } finally {
+        matchmakingInFlightRef.current = null;
       }
     },
-    [session, handleMatchData, handleMatchmakerMatched, resetMatchState, setMatchId, setTicket],
+    [
+      session,
+      handleMatchData,
+      handleMatchmakerMatched,
+      resetMatchState,
+      setMatchId,
+      setTicket,
+      status,
+    ],
   );
 
   const cancelMatchmaking = React.useCallback(async () => {
     const ticket = ticketRef.current;
     if (ticket) {
+      console.debug('MatchContext: cancelling matchmaking with active ticket', {
+        ticket,
+        status,
+      });
       await nakamaService.removeMatchmaker(ticket);
+    }
+
+    if (!ticket) {
+      console.debug('MatchContext: cancelMatchmaking called without active ticket', {
+        status,
+      });
     }
 
     setTicket(null);
     setStatus('idle');
-  }, [setTicket]);
+  }, [setTicket, status]);
 
   const leaveMatch = React.useCallback(async () => {
     const activeMatch = matchIdRef.current;
@@ -247,7 +325,11 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
       }
 
       try {
-        await socket.sendMatchState(matchIdState, MATCH_OPCODES.PLAYER_MOVE, JSON.stringify({ position }));
+        await socket.sendMatchState(
+          matchIdState,
+          MATCH_OPCODES.PLAYER_MOVE,
+          JSON.stringify({ position }),
+        );
       } catch (moveError) {
         console.warn('Failed to send move', moveError);
       }
@@ -285,7 +367,8 @@ export const MatchProvider: React.FC<React.PropsWithChildren> = ({ children }) =
     }
 
     return (
-      Object.values(matchState.players).find((participant) => participant.userId !== playerId) ?? null
+      Object.values(matchState.players).find((participant) => participant.userId !== playerId) ??
+      null
     );
   }, [matchState, playerId]);
 

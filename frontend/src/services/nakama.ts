@@ -381,8 +381,25 @@ class NakamaService {
 
     const query = `+mode:${mode}`;
     const stringProps = { mode };
+    console.debug('NakamaService: submitting matchmaking ticket', {
+      mode,
+      minPlayers,
+      maxPlayers,
+    });
 
-    return socket.addMatchmaker(query, minPlayers, maxPlayers, stringProps, undefined);
+    const ticket = await socket.addMatchmaker(
+      query,
+      minPlayers,
+      maxPlayers,
+      stringProps,
+      undefined,
+    );
+    console.debug('NakamaService: matchmaking ticket accepted', {
+      mode,
+      ticket: ticket.ticket,
+    });
+
+    return ticket;
   }
 
   /**
@@ -395,6 +412,7 @@ class NakamaService {
     }
 
     try {
+      console.debug('NakamaService: removing matchmaking ticket', { ticket });
       await socket.removeMatchmaker(ticket);
     } catch (error) {
       console.warn('Failed to remove matchmaking ticket', error);
