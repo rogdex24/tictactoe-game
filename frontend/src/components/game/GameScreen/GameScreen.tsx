@@ -3,9 +3,10 @@ import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useMatch } from '../../../state/MatchContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
@@ -16,142 +17,132 @@ import { TextButton } from '../../common/TextButton';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 import { GameBoard, GameSymbol } from '../GameBoard';
 
-type PlayerMark = 'X' | 'O';
-
-type GameState = 'PLAYING' | 'WON' | 'DRAW' | 'LOSE';
-
-const WINNING_COMBINATIONS: Array<[number, number, number]> = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
-const evaluateBoard = (
-  cells: (PlayerMark | null)[],
-): { winner: PlayerMark | null; line: [number, number, number] | null } => {
-  for (const combination of WINNING_COMBINATIONS) {
-    const [a, b, c] = combination;
-    const candidate = cells[a];
-    if (candidate && candidate === cells[b] && candidate === cells[c]) {
-      return { winner: candidate, line: combination };
-    }
-  }
-
-  return { winner: null, line: null };
-};
-
-const isBoardFull = (cells: (PlayerMark | null)[]) => cells.every((cell) => cell !== null);
-
 export const GameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { playerName } = usePlayer();
-  const displayName = playerName || 'Player';
-  const opponentName = 'CPU';
+  const { playerName, session } = usePlayer();
+  const { matchState, playerMark, opponent, isMyTurn, sendMove, leaveMatch, mode } = useMatch();
+  const myUserId = session?.user_id ?? null;
+
+  const board = matchState.board;
+
+  const myProfileName = React.useMemo(() => {
+    if (myUserId && matchState.players[myUserId]?.username) {
+      return matchState.players[myUserId].username;
+    }
+    return playerName || 'Player';
+  }, [matchState.players, myUserId, playerName]);
+
+  const opponentName = React.useMemo(() => {
+    if (opponent?.displayName && opponent.displayName.length > 0) {
+      return opponent.displayName;
+    }
+
+    if (opponent?.username) {
+      return opponent.username;
+    }
+
+    return 'Opponent';
+  }, [opponent]);
 
   const handleLeaderboard = useCallback(() => {
     navigation.navigate('Leaderboard');
   }, [navigation]);
 
-  const [board, setBoard] = useState<(PlayerMark | null)[]>(Array(9).fill(null));
-  const [currentPlayer, setCurrentPlayer] = useState<PlayerMark>('X');
-  const [gameState, setGameState] = useState<GameState>('PLAYING');
-  const [statusMessage, setStatusMessage] = useState<string>('Your Turn');
-  const [winner, setWinner] = useState<PlayerMark | null>(null);
-  const [winningCells, setWinningCells] = useState<number[] | null>(null);
+  const winningCells = matchState.winningLine;
+  const isGameComplete = matchState.phase === 'complete';
 
-  const resetGame = useCallback(() => {
-    setBoard(Array(9).fill(null));
-    setCurrentPlayer('X');
-    setGameState('PLAYING');
-    setWinner(null);
-    setWinningCells(null);
-    setStatusMessage('Your Turn');
-  }, []);
-
-  const handlePlayAgain = useCallback(() => {
-    resetGame();
-  }, [resetGame]);
-
-  const handleLeaveGame = useCallback(() => {
-    resetGame();
-    navigation.navigate('Home');
-  }, [navigation, resetGame]);
-
-  useEffect(() => {
-    resetGame();
-  }, [resetGame]);
-
-  useEffect(() => {
-    if (gameState === 'PLAYING') {
-      setStatusMessage(currentPlayer === 'X' ? 'Your Turn' : 'Opponent Turn');
-    }
-  }, [currentPlayer, gameState]);
-
-  const handleCellPress = useCallback(
-    (index: number) => {
-      if (gameState !== 'PLAYING' || board[index]) {
-        return;
-      }
-
-      const nextBoard = [...board];
-      nextBoard[index] = currentPlayer;
-      setBoard(nextBoard);
-
-      const { winner: roundWinner, line } = evaluateBoard(nextBoard);
-
-      if (roundWinner) {
-        setGameState(roundWinner === 'X' ? 'WON' : 'LOSE');
-        setWinner(roundWinner);
-        setWinningCells(line);
-        const winnerName = roundWinner === 'X' ? displayName : opponentName;
-        setStatusMessage(`${winnerName} (${roundWinner}) Wins!`);
-        return;
-      }
-
-      if (isBoardFull(nextBoard)) {
-        setGameState('DRAW');
-        setWinningCells(null);
-        setStatusMessage("It's a Draw!");
-        return;
-      }
-
-      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
-    },
-    [board, currentPlayer, gameState, displayName, opponentName],
-  );
-
-  const boardDisabled = gameState !== 'PLAYING';
-
-  const activeSymbol = useMemo<PlayerMark>(() => {
-    if ((gameState === 'WON' || gameState === 'LOSE') && winner) {
-      return winner;
+  const statusMessage = useMemo(() => {
+    if (matchState.phase === 'waiting') {
+      return 'Waiting for opponent...';
     }
 
-    return currentPlayer;
-  }, [currentPlayer, gameState, winner]);
+    if (matchState.phase === 'playing') {
+      return isMyTurn ? 'Your Turn' : `${opponentName}'s Turn`;
+    }
+
+    if (matchState.phase === 'complete') {
+      if (matchState.winner && matchState.winner === myUserId) {
+        return 'You Win!';
+      }
+
+      if (matchState.winner && matchState.winner !== myUserId) {
+        return `${opponentName} Wins!`;
+      }
+
+      return "It's a Draw!";
+    }
+
+    return 'Connecting to match...';
+  }, [isMyTurn, matchState.phase, matchState.winner, myUserId, opponentName]);
 
   const statusColor = useMemo(() => {
-    if (gameState === 'WON') {
-      return winner === 'X' ? colors.accentMint : colors.accentTealSoft;
-    }
-
-    if (gameState === 'LOSE') {
-      return colors.accentDanger;
-    }
-
-    if (gameState === 'DRAW') {
+    if (matchState.phase === 'complete') {
+      if (matchState.winner && matchState.winner === myUserId) {
+        return colors.accentMint;
+      }
+      if (matchState.winner && matchState.winner !== myUserId) {
+        return colors.accentDanger;
+      }
       return colors.accentDraw;
     }
 
-    return currentPlayer === 'X' ? colors.accentMint : colors.textTealHighlight;
-  }, [currentPlayer, gameState, winner]);
+    if (matchState.phase === 'playing') {
+      return isMyTurn ? colors.accentMint : colors.textTealHighlight;
+    }
 
-  const isGameComplete = gameState === 'WON' || gameState === 'LOSE' || gameState === 'DRAW';
+    return colors.textTealHighlight;
+  }, [isMyTurn, matchState.phase, matchState.winner, myUserId]);
+
+  const activeSymbol = useMemo(() => {
+    if (matchState.phase === 'complete') {
+      if (matchState.winnerMark) {
+        return matchState.winnerMark;
+      }
+      return playerMark ?? opponent?.mark ?? 'X';
+    }
+
+    if (matchState.phase === 'playing') {
+      const currentPresence = matchState.currentTurn
+        ? matchState.players[matchState.currentTurn]
+        : undefined;
+      return currentPresence?.mark ?? playerMark ?? 'X';
+    }
+
+    return playerMark ?? 'X';
+  }, [matchState.currentTurn, matchState.phase, matchState.players, matchState.winnerMark, opponent?.mark, playerMark]);
+
+  const boardDisabled = matchState.phase !== 'playing' || !isMyTurn;
+
+  const handleCellPress = useCallback(
+    (index: number) => {
+      if (boardDisabled || board[index]) {
+        return;
+      }
+
+      sendMove(index).catch((error) => {
+        console.warn('Failed to send move', error);
+      });
+    },
+    [board, boardDisabled, sendMove],
+  );
+
+  const handlePlayAgain = useCallback(async () => {
+    try {
+      await leaveMatch();
+    } catch (error) {
+      console.warn('Failed to leave match before rematch', error);
+    }
+    navigation.replace('MatchLoading');
+  }, [leaveMatch, navigation]);
+
+  const handleLeaveGame = useCallback(async () => {
+    try {
+      await leaveMatch();
+    } catch (error) {
+      console.warn('Failed to leave match', error);
+    }
+    navigation.navigate('Home');
+  }, [leaveMatch, navigation]);
 
   return (
     <LinearGradient
@@ -166,13 +157,13 @@ export const GameScreen: React.FC = () => {
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.matchupRow}>
-              <Text style={[styles.matchupText, styles.matchupName]}>{displayName}</Text>
+              <Text style={[styles.matchupText, styles.matchupName]}>{myProfileName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (YOU)</Text>
               <Text style={[styles.matchupText, styles.matchupSeparator]}> vs. </Text>
               <Text style={[styles.matchupText, styles.matchupOpponent]}>{opponentName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (OPP)</Text>
             </View>
-            <Text style={styles.scoreText}>3 - 2</Text>
+            <Text style={styles.scoreText}>{`Mode: ${(mode ?? 'classic').toUpperCase()}`}</Text>
           </View>
           <View style={styles.body}>
             <View style={styles.turnIndicator}>

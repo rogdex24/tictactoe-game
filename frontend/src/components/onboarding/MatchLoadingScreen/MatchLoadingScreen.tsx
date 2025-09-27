@@ -7,6 +7,7 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthCheck } from '../../../hooks/useAuthCheck';
+import { useMatch } from '../../../state/MatchContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
@@ -19,62 +20,98 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 export const MatchLoadingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
-  const { ensureAuthenticated, isAuthenticated } = useAuthCheck();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { ensureAuthenticated } = useAuthCheck();
+  const { beginMatchmaking, cancelMatchmaking, leaveMatch, status, error, matchId, matchState } =
+    useMatch();
 
-  const handleCancel = React.useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    navigation.navigate('Home');
-  }, [navigation]);
+  const [hasPromptedError, setHasPromptedError] = React.useState(false);
 
-  const startGame = React.useCallback(async () => {
+  const startMatchmaking = React.useCallback(async () => {
     try {
-      // Ensure authentication before starting the game
       await ensureAuthenticated();
-      navigation.navigate('Game');
-    } catch (error) {
-      console.error('Failed to authenticate before game start:', error);
+      await beginMatchmaking('classic');
+    } catch (authError) {
+      console.error('Failed to authenticate before matchmaking:', authError);
       Alert.alert(
         'Authentication Required',
         'Unable to connect to game servers. Please try again.',
         [
           {
             text: 'Retry',
-            onPress: startGame,
+            onPress: startMatchmaking,
           },
           {
             text: 'Go Back',
             style: 'cancel',
-            onPress: handleCancel,
+            onPress: () => navigation.navigate('Home'),
           },
         ],
       );
     }
-  }, [ensureAuthenticated, navigation, handleCancel]);
+  }, [beginMatchmaking, ensureAuthenticated, navigation]);
 
   React.useEffect(() => {
-    // Check if already authenticated, if so start immediately
-    if (isAuthenticated) {
-      timeoutRef.current = setTimeout(() => {
-        navigation.navigate('Game');
-      }, 1500); // Shorter delay if already authenticated
-    } else {
-      // Try to authenticate and then start game
-      timeoutRef.current = setTimeout(() => {
-        startGame();
-      }, 2000);
+    if (status === 'idle') {
+      startMatchmaking();
     }
 
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      cancelMatchmaking().catch((cancelError) => {
+        console.warn('Failed to cancel matchmaking on cleanup', cancelError);
+      });
     };
-  }, [navigation, isAuthenticated, startGame]);
+  }, [cancelMatchmaking, startMatchmaking, status]);
+
+  React.useEffect(() => {
+    if (status === 'error' && error && !hasPromptedError) {
+      setHasPromptedError(true);
+      Alert.alert('Matchmaking Failed', error, [
+        {
+          text: 'Retry',
+          onPress: () => {
+            setHasPromptedError(false);
+            startMatchmaking();
+          },
+        },
+        {
+          text: 'Go Back',
+          style: 'cancel',
+          onPress: () => navigation.navigate('Home'),
+        },
+      ]);
+    }
+  }, [error, hasPromptedError, navigation, startMatchmaking, status]);
+
+  React.useEffect(() => {
+    if (matchId && matchState.phase === 'playing') {
+      navigation.replace('Game');
+    }
+  }, [matchId, matchState.phase, navigation]);
+
+  const handleCancel = React.useCallback(() => {
+    Promise.all([cancelMatchmaking(), leaveMatch()]).finally(() => {
+      navigation.navigate('Home');
+    });
+  }, [cancelMatchmaking, leaveMatch, navigation]);
+
+  const statusMessage = React.useMemo(() => {
+    switch (status) {
+      case 'searching':
+        return 'Searching for an opponent...';
+      case 'matched':
+        return 'Match found! Preparing arena...';
+      case 'joining':
+        return 'Joining the match...';
+      case 'ready':
+        return matchState.phase === 'playing'
+          ? 'Match ready! Launching game...'
+          : 'Waiting for players to join...';
+      case 'error':
+        return 'Unable to start matchmaking.';
+      default:
+        return 'Preparing matchmaking...';
+    }
+  }, [matchState.phase, status]);
 
   return (
     <LinearGradient
@@ -92,8 +129,12 @@ export const MatchLoadingScreen: React.FC = () => {
               style={[typography.bodyPrimary, styles.greeting]}
             >{`Hi, ${playerName || 'Player'}!`}</Text>
             <LoadingSpinner />
-            <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
-            <Text style={[typography.bodyPrimary, styles.subtitle]}>Please wait a moment.</Text>
+            <Text style={[typography.headingSecondary, styles.title]}>{statusMessage}</Text>
+            <Text style={[typography.bodyPrimary, styles.subtitle]}>
+              {status === 'error'
+                ? 'We could not start a match. Try again in a moment.'
+                : 'This may take a few seconds.'}
+            </Text>
           </View>
           <View style={styles.footer}>
             <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />

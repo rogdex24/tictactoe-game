@@ -1,8 +1,11 @@
 import { Platform } from 'react-native';
 
 import { Client, Session } from '@heroiclabs/nakama-js';
+import type { Match, MatchmakerTicket, Socket } from '@heroiclabs/nakama-js';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+
+import type { MatchMode } from '../types/match';
 
 // Nakama server configuration from environment variables
 const NAKAMA_SERVER_KEY = process.env.EXPO_PUBLIC_NAKAMA_SERVER_KEY || 'defaultkey';
@@ -102,6 +105,8 @@ async function getOrCreateDeviceId(): Promise<string> {
 class NakamaService {
   private client: Client;
   private currentSession: Session | null = null;
+  private socket: Socket | null = null;
+  private socketConnected = false;
 
   constructor() {
     this.client = new Client(
@@ -117,6 +122,17 @@ class NakamaService {
    */
   getSession(): Session | null {
     return this.currentSession;
+  }
+
+  /**
+   * Get the active Nakama socket if connected
+   */
+  getSocket(): Socket | null {
+    if (this.socket && this.socketConnected) {
+      return this.socket;
+    }
+
+    return null;
   }
 
   /**
@@ -177,6 +193,7 @@ class NakamaService {
    */
   async authenticateDevice(playerName: string): Promise<Session> {
     try {
+      await this.disconnectSocket();
       const deviceId = await getOrCreateDeviceId();
 
       // Generate a unique username with display name + 2 random digits
@@ -239,6 +256,8 @@ class NakamaService {
   async clearSession(): Promise<void> {
     this.currentSession = null;
 
+    await this.disconnectSocket();
+
     try {
       await Promise.all([
         secureStorage.removeItem(SESSION_TOKEN_KEY),
@@ -254,6 +273,8 @@ class NakamaService {
    */
   async clearAllData(): Promise<void> {
     this.currentSession = null;
+
+    await this.disconnectSocket();
 
     try {
       await Promise.all([
@@ -300,6 +321,107 @@ class NakamaService {
     } catch (error) {
       console.error('Failed to get account info:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Establish or reuse a realtime socket connection for the active session.
+   */
+  async connectSocket(): Promise<Socket> {
+    if (!this.currentSession) {
+      throw new Error('No active session. Authenticate before connecting the socket.');
+    }
+
+    if (this.socket && this.socketConnected) {
+      return this.socket;
+    }
+
+    const socket = this.client.createSocket(NAKAMA_USE_SSL, false);
+
+    const originalDisconnect = socket.ondisconnect;
+    socket.ondisconnect = (event) => {
+      this.socketConnected = false;
+      this.socket = null;
+      if (typeof originalDisconnect === 'function') {
+        originalDisconnect(event);
+      }
+    };
+
+    socket.onerror = (event) => {
+      console.warn('Nakama socket encountered an error', event);
+    };
+
+    await socket.connect(this.currentSession, true);
+    this.socket = socket;
+    this.socketConnected = true;
+    return socket;
+  }
+
+  /**
+   * Disconnect an active socket connection if present.
+   */
+  async disconnectSocket(): Promise<void> {
+    if (this.socket) {
+      try {
+        this.socket.disconnect(true);
+      } catch (error) {
+        console.warn('Failed to disconnect Nakama socket', error);
+      }
+    }
+
+    this.socket = null;
+    this.socketConnected = false;
+  }
+
+  /**
+   * Join the matchmaking queue for the supplied mode.
+   */
+  async addMatchmaker(mode: MatchMode, minPlayers = 2, maxPlayers = 2): Promise<MatchmakerTicket> {
+    const socket = await this.connectSocket();
+
+    const query = `+mode:${mode}`;
+    const stringProps = { mode };
+
+    return socket.addMatchmaker(query, minPlayers, maxPlayers, stringProps, undefined);
+  }
+
+  /**
+   * Remove an existing matchmaking ticket if the socket is connected.
+   */
+  async removeMatchmaker(ticket: string): Promise<void> {
+    const socket = this.getSocket();
+    if (!socket) {
+      return;
+    }
+
+    try {
+      await socket.removeMatchmaker(ticket);
+    } catch (error) {
+      console.warn('Failed to remove matchmaking ticket', error);
+    }
+  }
+
+  /**
+   * Join an authoritative match by identifier.
+   */
+  async joinMatch(matchId: string): Promise<Match> {
+    const socket = await this.connectSocket();
+    return socket.joinMatch(matchId);
+  }
+
+  /**
+   * Leave an active match if connected.
+   */
+  async leaveMatch(matchId: string): Promise<void> {
+    const socket = this.getSocket();
+    if (!socket) {
+      return;
+    }
+
+    try {
+      await socket.leaveMatch(matchId);
+    } catch (error) {
+      console.warn('Failed to leave match', error);
     }
   }
 }

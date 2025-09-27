@@ -11,6 +11,7 @@ import { HomeScreen } from './src/components/home/HomeScreen';
 import { LeaderboardScreen } from './src/components/leaderboard/LeaderboardScreen';
 import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
+import { MatchProvider } from './src/state/MatchContext';
 import { PlayerProvider } from './src/state/PlayerContext';
 import type { RootStackParamList } from './src/types/components';
 
@@ -42,15 +43,17 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <PlayerProvider>
-        <NavigationContainer>
-          <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
-            <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
-            <Stack.Screen name="Game" component={GameScreen} />
-            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
+        <MatchProvider>
+          <NavigationContainer>
+            <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
+              <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
+              <Stack.Screen name="Game" component={GameScreen} />
+              <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </MatchProvider>
       </PlayerProvider>
     </SafeAreaProvider>
   );
