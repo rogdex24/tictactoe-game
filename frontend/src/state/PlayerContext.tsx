@@ -189,7 +189,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     setIsAuthLoading(true);
 
     try {
-      // Update name on server using custom RPC
+      // Update name on server using Nakama's built-in updateAccount method
       await nakamaService.updatePlayerName(newName);
 
       // Update local state
