@@ -182,7 +182,11 @@ class NakamaService {
       const randomSuffix = Math.floor(Math.random() * 100)
         .toString()
         .padStart(2, '0');
-      const uniqueUsername = `${playerName.toLowerCase().replace(/[^a-z0-9]/g, '')}${randomSuffix}`;
+      let baseName = playerName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!baseName) {
+        baseName = 'player';
+      }
+      const uniqueUsername = `${baseName}${randomSuffix}`;
 
       // Authenticate with Nakama using device ID and unique username
       const session = await this.client.authenticateDevice(
