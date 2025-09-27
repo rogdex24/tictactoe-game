@@ -1,7 +1,10 @@
 import { Platform } from 'react-native';
 
+import type { Session } from '@heroiclabs/nakama-js';
 import * as SecureStore from 'expo-secure-store';
 import React from 'react';
+
+import { nakamaService } from '../services/nakama';
 
 const PLAYER_STORAGE_KEY = 'player-profile';
 
@@ -80,6 +83,13 @@ interface PlayerContextValue {
   playerName: string;
   setPlayerName: (name: string) => void;
   clearPlayer: () => void;
+  // Authentication state
+  isAuthenticated: boolean;
+  session: Session | null;
+  isAuthLoading: boolean;
+  authenticate: (playerName?: string) => Promise<void>;
+  updatePlayerName: (newName: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const PlayerContext = React.createContext<PlayerContextValue | undefined>(undefined);
@@ -92,17 +102,29 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
   const [playerName, setPlayerName] = React.useState('');
   const [isHydrated, setIsHydrated] = React.useState(false);
 
+  // Authentication state
+  const [session, setSession] = React.useState<Session | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = React.useState(false);
+
   React.useEffect(() => {
     const hydrate = async () => {
-      const storedName = await readStoredName();
-      setPlayerName(storedName);
-      setIsHydrated(true);
+      try {
+        // Load player name
+        const storedName = await readStoredName();
+        setPlayerName(storedName);
+
+        // Try to restore session
+        const restoredSession = await nakamaService.restoreSession();
+        setSession(restoredSession);
+
+        setIsHydrated(true);
+      } catch (error) {
+        console.warn('Failed to hydrate player storage', error);
+        setIsHydrated(true);
+      }
     };
 
-    hydrate().catch((error) => {
-      console.warn('Failed to hydrate player storage', error);
-      setIsHydrated(true);
-    });
+    hydrate();
   }, []);
 
   React.useEffect(() => {
@@ -123,13 +145,88 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     setPlayerName('');
   }, []);
 
+  const handleAuthenticate = React.useCallback(
+    async (customPlayerName?: string) => {
+      setIsAuthLoading(true);
+
+      try {
+        const nameToUse = customPlayerName || playerName || 'Player';
+        const authenticatedSession = await nakamaService.authenticateDevice(nameToUse);
+        setSession(authenticatedSession);
+
+        // Update player name if a custom one was used
+        if (customPlayerName && customPlayerName !== playerName) {
+          setPlayerName(customPlayerName);
+        }
+      } catch (error) {
+        console.error('Authentication failed:', error);
+        throw error;
+      } finally {
+        setIsAuthLoading(false);
+      }
+    },
+    [playerName],
+  );
+
+  const handleLogout = React.useCallback(async () => {
+    setIsAuthLoading(true);
+
+    try {
+      await nakamaService.clearSession();
+      setSession(null);
+    } catch (error) {
+      console.warn('Logout failed:', error);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, []);
+
+  const handleUpdatePlayerName = React.useCallback(async (newName: string) => {
+    if (!nakamaService.isAuthenticated()) {
+      throw new Error('Must be authenticated to update player name');
+    }
+
+    setIsAuthLoading(true);
+
+    try {
+      // Update name on server using custom RPC
+      await nakamaService.updatePlayerName(newName);
+
+      // Update local state
+      setPlayerName(newName);
+    } catch (error) {
+      console.error('Failed to update player name:', error);
+      throw error;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, []);
+
+  const isAuthenticated = nakamaService.isAuthenticated();
+
   const value = React.useMemo(
     () => ({
       playerName,
       setPlayerName: handleSetPlayerName,
       clearPlayer: handleClearPlayer,
+      isAuthenticated,
+      session,
+      isAuthLoading,
+      authenticate: handleAuthenticate,
+      updatePlayerName: handleUpdatePlayerName,
+      logout: handleLogout,
     }),
-    [handleClearPlayer, handleSetPlayerName, playerName],
+    [
+      playerName,
+      handleSetPlayerName,
+      handleClearPlayer,
+      isAuthenticated,
+      session,
+      isAuthLoading,
+      handleAuthenticate,
+      handleUpdatePlayerName,
+      handleLogout,
+    ],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

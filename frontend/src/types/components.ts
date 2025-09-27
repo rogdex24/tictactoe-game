@@ -13,4 +13,5 @@ export type RootStackParamList = {
 export interface CtaButtonProps {
   label: string;
   onPress: () => void;
+  disabled?: boolean;
 }
