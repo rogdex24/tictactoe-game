@@ -59,7 +59,7 @@ jobs:
         working-directory: backend
         run: |
           mkdir -p build
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildmode=plugin -o build/backend.so
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath --mod=vendor -buildmode=plugin -o build/backend.so
       - name: Docker build
         run: docker build -f backend/Dockerfile -t tictactoe/nakama:ci ./backend
       - name: Push to Artifact Registry
