@@ -1,0 +1,24 @@
+name: nakama-node
+
+logger:
+  max_size: 100
+  level: DEBUG
+  format: stackdriver
+
+database:
+  address:
+    - 'postgres:localdb@postgres:5432/nakama'
+  conn_max_lifetime_ms: 0
+  max_open_conns: 0
+  max_idle_conns: 100
+
+session:
+  token_expiry_sec: 7200
+
+runtime:
+  path: '/nakama/data/modules'
+
+console:
+  port: 7351
+  username: 'admin'
+  password: 'password'

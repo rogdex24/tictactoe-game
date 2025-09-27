@@ -26,9 +26,9 @@ backend/bin/
 data/
 
 # Docker artifacts
-infra/.env
-infra/.tmp
-infra/bin/
+backend/.env
+backend/.tmp
+backend/bin/
 
 # Coverage
 coverage/

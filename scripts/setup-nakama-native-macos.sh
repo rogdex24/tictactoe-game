@@ -13,7 +13,7 @@ case "$ARCH" in
 esac
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-INSTALL_DIR="$REPO_ROOT/infra/bin"
+INSTALL_DIR="$REPO_ROOT/backend/bin"
 TARGET="$INSTALL_DIR/nakama"
 
 if [[ -x "$TARGET" ]]; then

@@ -10,7 +10,6 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
 .
 ├── frontend/        # Expo React Native application
 ├── backend/         # Go Nakama plugin source and tooling
-├── infra/           # Docker & infrastructure automation
 ├── scripts/         # Shared development helpers
 ├── package.json     # Root workspace configuration
 ├── pnpm-workspace.yaml
@@ -53,37 +52,47 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
    pnpm prepare
    ```
 
-4. Download the Nakama macOS binary (Apple Silicon or Intel detected automatically)
+4. Start the backend services using Docker Compose (recommended)
 
    ```bash
-   ./scripts/setup-nakama-macos.sh
+   docker compose -f backend/docker-compose.yml up -d
    ```
 
-5. Start PostgreSQL (Docker) and run Nakama locally
+   This starts both PostgreSQL and Nakama with the compiled Go plugin.
+
+5. (Optional) For native development, download the Nakama macOS binary
 
    ```bash
-   ./scripts/run-nakama-local.sh
+   ./scripts/setup-nakama-native-macos.sh
+   ```
+
+6. (Optional) For native development, start PostgreSQL (Docker) and run Nakama locally
+
+   ```bash
+   ./scripts/run-nakama-native-local.sh
    ```
 
    The script rebuilds the Go plugin for the host architecture into `backend/build/darwin-<arch>/` and then tails the Nakama process. Set `NAKAMA_SKIP_PLUGIN=1` if you want to launch Nakama without loading the custom module. Press `Ctrl+C` to stop the server.
 
-   Once Nakama reports that runtime initialization succeeded, you can confirm it is reachable:
+7. Verify the backend is running
+
+8. Verify the backend is running
 
    ```bash
    ./scripts/check-backend-health.sh
    ```
 
-   Stop Postgres afterwards with:
+9. Stop the backend services
 
    ```bash
-   docker compose -f infra/docker-compose.yml down
+   docker compose -f backend/docker-compose.yml down
    ```
 
-6. Launch the Expo development server
+10. Launch the Expo development server
 
-   ```bash
-   pnpm --filter frontend start
-   ```
+    ```bash
+    pnpm --filter frontend start
+    ```
 
 ## Workspace Commands
 
@@ -110,12 +119,12 @@ pnpm typecheck  # Runs TypeScript and Go vet checks
 - `pnpm --filter backend test` – Runs Go tests
 - `pnpm --filter backend lint` – `golangci-lint`
 - `pnpm --filter backend typecheck` – `go vet`
-- `./scripts/run-nakama-local.sh` – macOS development server (Postgres via Docker, Nakama native binary)
+- `./scripts/run-nakama-native-local.sh` – macOS development server (Postgres via Docker, Nakama native binary)
 
 ### Infrastructure
 
-- `docker compose -f infra/docker-compose.yml up -d postgres` – Start local Postgres only
-- `make -C infra deploy` – Builds & pushes the Nakama Docker image to GCP Artifact Registry (requires authentication)
+- `docker compose -f backend/docker-compose.yml up -d` – Start local PostgreSQL and Nakama services
+- `docker compose -f backend/docker-compose.yml up -d postgres` – Start local Postgres only
 
 ## Environment Variables
 

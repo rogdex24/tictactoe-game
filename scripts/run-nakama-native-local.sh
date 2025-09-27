@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-NAKAMA_BINARY="$REPO_ROOT/infra/bin/nakama"
+NAKAMA_BINARY="$REPO_ROOT/backend/bin/nakama"
 
 if [[ ! -x "$NAKAMA_BINARY" ]]; then
   echo "Nakama binary not found. Run scripts/setup-nakama-macos.sh first." >&2
@@ -17,17 +17,17 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
 fi
 
 POSTGRES_DB=${POSTGRES_DB:-nakama}
-POSTGRES_USER=${POSTGRES_USER:-nakama}
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-local-password}
+POSTGRES_USER=${POSTGRES_USER:-postgres}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-localdb}
 
 # Ensure Postgres container is running
-DOCKER_COMPOSE_FILE="$REPO_ROOT/infra/docker-compose.yml"
+DOCKER_COMPOSE_FILE="$REPO_ROOT/backend/docker-compose.yml"
 
 if ! docker compose -f "$DOCKER_COMPOSE_FILE" ps postgres >/dev/null 2>&1; then
   echo "Starting postgres container..."
 fi
 
-docker compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans postgres >/dev/null
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d postgres >/dev/null
 
 declare ARCH
 case "$(uname -m)" in
@@ -85,7 +85,7 @@ echo "Nakama starting with database=$DB_ADDRESS"
 "$NAKAMA_BINARY" migrate up --database.address "$DB_ADDRESS"
 
 exec "$NAKAMA_BINARY" \
-  --name nakama-dev \
+  --name nakama-native-dev \
   --data_dir "$REPO_ROOT/backend/data" \
   --database.address "$DB_ADDRESS" \
   "${RUNTIME_ARGS[@]}" \

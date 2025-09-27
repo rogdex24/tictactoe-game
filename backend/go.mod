@@ -1,4 +1,4 @@
-module github.com/example/tictactoe/backend
+module github.com/rogdex24/tictactoe/backend
 
 go 1.25.0
 
