@@ -21,7 +21,6 @@ services:
   nakama:
     container_name: nakama
     build: .
-    image: registry.heroiclabs.com/heroiclabs/nakama:3.32.0
     entrypoint:
       - '/bin/sh'
       - '-ecx'
