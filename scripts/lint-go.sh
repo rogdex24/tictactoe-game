@@ -55,7 +55,10 @@ fi
 REL_FILES=()
 for file in "${CHANGED_FILES[@]-}"; do
   if [[ "$file" == backend/* ]]; then
-    REL_FILES+=("${file#backend/}")
+    # Skip vendor files
+    if [[ "$file" != backend/vendor/* ]]; then
+      REL_FILES+=("${file#backend/}")
+    fi
   fi
 done
 

@@ -59,18 +59,14 @@ jobs:
         working-directory: backend
         run: |
           mkdir -p build
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildmode=plugin -o build/match_handler.so ./cmd/plugin
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath --mod=vendor -buildmode=plugin -o build/backend.so
       - name: Docker build
-        run: docker build -f infra/Dockerfile.nakama -t tictactoe/nakama:ci .
+        run: docker build -f backend/Dockerfile -t tictactoe/nakama:ci ./backend
       - name: Push to Artifact Registry
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.GCP_ARTIFACT_REPOSITORY
         env:
-          GCP_ARTIFACT_REPOSITORY: \${{ secrets.GCP_ARTIFACT_REPOSITORY }}
+          GCP_ARTIFACT_REPOSITORY: ${{ secrets.GCP_ARTIFACT_REPOSITORY }}
         run: |
-          if [ -z "$GCP_ARTIFACT_REPOSITORY" ]; then
-            echo "GCP_ARTIFACT_REPOSITORY secret is not set. Skipping push."
-            exit 0
-          fi
           echo "$GCP_ARTIFACT_REPOSITORY" | awk -F'/' '{print $1}' | xargs gcloud auth configure-docker
           docker tag tictactoe/nakama:ci "$GCP_ARTIFACT_REPOSITORY"
           docker push "$GCP_ARTIFACT_REPOSITORY"
