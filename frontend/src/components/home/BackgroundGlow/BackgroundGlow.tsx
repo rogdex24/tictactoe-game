@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
   topGlow: {
     width: 256,
     height: 256,
-    backgroundColor: colors.glowCoral,
+    backgroundColor: colors.glowTeal,
     opacity: 0.5,
     top: 0,
     left: '50%',
