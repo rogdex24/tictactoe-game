@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, StatusBar, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuthCheck } from '../../../hooks/useAuthCheck';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, offsets, spacing } from '../../../styles/dimensions';
@@ -21,16 +22,37 @@ import { GameIcons } from '../GameIcons';
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
+  const { ensureAuthenticated, isAuthLoading } = useAuthCheck();
   const trimmedName = playerName.trim();
   const hasPlayerName = trimmedName.length > 0;
 
-  const handleStart = () => {
-    if (hasPlayerName) {
-      navigation.navigate('MatchLoading');
+  const handleStart = async () => {
+    // If no player name, go to player name screen first
+    if (!hasPlayerName) {
+      navigation.navigate('PlayerName', { nextScreen: 'MatchLoading' });
       return;
     }
 
-    navigation.navigate('PlayerName', { nextScreen: 'MatchLoading' });
+    // Ensure user is authenticated before starting game
+    try {
+      await ensureAuthenticated();
+      navigation.navigate('MatchLoading');
+    } catch (error) {
+      Alert.alert(
+        'Authentication Required',
+        'Unable to authenticate. Please check your connection and try again.',
+        [
+          {
+            text: 'Retry',
+            onPress: handleStart,
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ],
+      );
+    }
   };
 
   const handleLeaderboard = () => {
@@ -76,7 +98,11 @@ export const HomeScreen: React.FC = () => {
             <GameIcons />
           </View>
           <View style={styles.ctaArea}>
-            <CustomButton label="Start Game" onPress={handleStart} />
+            <CustomButton
+              label={isAuthLoading ? 'Connecting...' : 'Start Game'}
+              onPress={handleStart}
+              disabled={isAuthLoading}
+            />
             <TextButton
               label="View Leaderboard"
               onPress={handleLeaderboard}

@@ -18,7 +18,14 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 export const PlayerNameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'PlayerName'>>();
-  const { playerName, setPlayerName } = usePlayer();
+  const {
+    playerName,
+    setPlayerName,
+    authenticate,
+    updatePlayerName,
+    isAuthLoading,
+    isAuthenticated,
+  } = usePlayer();
   const [name, setName] = React.useState(playerName);
   const nextScreen = route.params?.nextScreen ?? 'MatchLoading';
 
@@ -30,12 +37,36 @@ export const PlayerNameScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const trimmedName = name.trim();
     const nextName = trimmedName.length > 0 ? trimmedName : 'Player';
 
-    setPlayerName(nextName);
-    navigation.navigate(nextScreen);
+    try {
+      if (isAuthenticated && nextName !== playerName) {
+        // User is already authenticated and wants to update their name
+        await updatePlayerName(nextName);
+      } else if (!isAuthenticated) {
+        // User needs to be authenticated
+        setPlayerName(nextName);
+        await authenticate(nextName);
+      } else {
+        // Name hasn't changed, just set it locally
+        setPlayerName(nextName);
+      }
+
+      navigation.navigate(nextScreen);
+    } catch (error) {
+      console.error('Failed to update name or authenticate:', error);
+      // Still navigate but user might not be authenticated - will be handled in game flow
+      navigation.navigate(nextScreen);
+    }
+  };
+
+  const getButtonLabel = () => {
+    if (isAuthLoading) {
+      return isAuthenticated ? 'Updating name...' : 'Authenticating...';
+    }
+    return isAuthenticated && name !== playerName ? 'Update Name' : 'Continue';
   };
 
   return (
@@ -68,7 +99,11 @@ export const PlayerNameScreen: React.FC = () => {
             />
           </View>
           <View style={styles.footer}>
-            <CustomButton label="Continue" onPress={handleContinue} />
+            <CustomButton
+              label={getButtonLabel()}
+              onPress={handleContinue}
+              disabled={isAuthLoading}
+            />
           </View>
         </View>
       </SafeAreaView>

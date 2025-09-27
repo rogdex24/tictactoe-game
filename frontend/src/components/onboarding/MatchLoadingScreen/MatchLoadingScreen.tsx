@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuthCheck } from '../../../hooks/useAuthCheck';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
@@ -18,20 +19,54 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 export const MatchLoadingScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
+  const { ensureAuthenticated, isAuthenticated } = useAuthCheck();
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCancel = () => {
+  const handleCancel = React.useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
     navigation.navigate('Home');
-  };
+  }, [navigation]);
+
+  const startGame = React.useCallback(async () => {
+    try {
+      // Ensure authentication before starting the game
+      await ensureAuthenticated();
+      navigation.navigate('Game');
+    } catch (error) {
+      console.error('Failed to authenticate before game start:', error);
+      Alert.alert(
+        'Authentication Required',
+        'Unable to connect to game servers. Please try again.',
+        [
+          {
+            text: 'Retry',
+            onPress: startGame,
+          },
+          {
+            text: 'Go Back',
+            style: 'cancel',
+            onPress: handleCancel,
+          },
+        ],
+      );
+    }
+  }, [ensureAuthenticated, navigation, handleCancel]);
 
   React.useEffect(() => {
-    timeoutRef.current = setTimeout(() => {
-      navigation.navigate('Game');
-    }, 3000);
+    // Check if already authenticated, if so start immediately
+    if (isAuthenticated) {
+      timeoutRef.current = setTimeout(() => {
+        navigation.navigate('Game');
+      }, 1500); // Shorter delay if already authenticated
+    } else {
+      // Try to authenticate and then start game
+      timeoutRef.current = setTimeout(() => {
+        startGame();
+      }, 2000);
+    }
 
     return () => {
       if (timeoutRef.current) {
@@ -39,7 +74,7 @@ export const MatchLoadingScreen: React.FC = () => {
         timeoutRef.current = null;
       }
     };
-  }, [navigation]);
+  }, [navigation, isAuthenticated, startGame]);
 
   return (
     <LinearGradient

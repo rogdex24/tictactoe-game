@@ -19,11 +19,13 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   onPress,
   style,
   variant = 'primary',
+  disabled = false,
 }) => {
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.base,
         variant === 'primary'
@@ -31,8 +33,10 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           : variant === 'secondary'
             ? styles.secondary
             : styles.danger,
+        disabled && styles.disabled,
         style,
-        pressed &&
+        !disabled &&
+          pressed &&
           (variant === 'primary'
             ? styles.primaryPressed
             : variant === 'secondary'
@@ -45,6 +49,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           styles.label,
           variant === 'secondary' && styles.secondaryLabel,
           variant === 'danger' && styles.dangerLabel,
+          disabled && styles.disabledLabel,
         ]}
       >
         {label}
@@ -99,5 +104,15 @@ const styles = StyleSheet.create({
   },
   dangerLabel: {
     color: colors.accentDangerText,
+  },
+  disabled: {
+    backgroundColor: colors.textSecondary,
+    opacity: 0.6,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  disabledLabel: {
+    color: colors.textSecondary,
+    opacity: 0.7,
   },
 });
