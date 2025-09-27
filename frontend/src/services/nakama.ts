@@ -146,7 +146,8 @@ class NakamaService {
       const session = Session.restore(authToken, refreshToken);
 
       // Check if session is close to expiry (within 1 day)
-      const unixTimeInFuture = Date.now() + 8.64e7; // one day from now
+      const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+      const unixTimeInFuture = Date.now() + ONE_DAY_IN_MS; // one day from now
 
       if (session.isexpired(unixTimeInFuture / 1000)) {
         try {
