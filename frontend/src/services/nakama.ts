@@ -169,7 +169,7 @@ class NakamaService {
   async disconnectSocket(): Promise<void> {
     if (this.socket) {
       try {
-        this.socket.disconnect();
+        this.socket.disconnect(true);
       } finally {
         this.socket = null;
         this.socketPromise = null;

@@ -25,7 +25,7 @@ import { GameBoard, GameSymbol } from '../../game/GameBoard';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 const MATCH_MODE_CLASSIC = 'classic';
-const MATCHMAKER_QUERY = '+mode:classic';
+const MATCHMAKER_QUERY = '*'; // Use '*' for token-based matchmaking (built-in Nakama)
 const MATCH_OPCODE_GAME_START = 1;
 const MATCH_OPCODE_BOARD_UPDATE = 2;
 const MATCH_OPCODE_GAME_OVER = 3;
@@ -125,6 +125,9 @@ export const PlayerGameScreen: React.FC = () => {
   const cleanupHandlersRef = React.useRef<(() => void) | null>(null);
   const isMountedRef = React.useRef(false);
   const selfUserIdRef = React.useRef<string | null>(null);
+  const isJoiningMatchRef = React.useRef(false); // Prevent race conditions
+  const processedTicketsRef = React.useRef(new Set<string>()); // Track processed tickets
+  const isMatchmakingActiveRef = React.useRef(false); // Track matchmaking state without causing re-renders
 
   const resetBoard = React.useCallback(() => {
     setBoard(createEmptyBoard());
@@ -141,9 +144,15 @@ export const PlayerGameScreen: React.FC = () => {
     const ticket = ticketRef.current;
     const match = matchRef.current;
 
+    console.log('🧹 Cleaning up matchmaking state');
+
+    // Reset all refs and state
     ticketRef.current = null;
     matchRef.current = null;
     selfUserIdRef.current = null;
+    isJoiningMatchRef.current = false;
+    processedTicketsRef.current.clear();
+    isMatchmakingActiveRef.current = false;
     setOpponentName(null);
     setOpponentConnected(false);
     setYourMark(null);
@@ -294,17 +303,69 @@ export const PlayerGameScreen: React.FC = () => {
   const handleMatchFound = React.useCallback(
     async (socket: Socket, matched: MatchmakerMatched) => {
       if (!isMountedRef.current) {
+        console.log('🚫 Ignoring matchmaker event - component unmounted');
         return;
       }
 
-      ticketRef.current = null;
+      // Prevent processing if already joining a match
+      if (isJoiningMatchRef.current) {
+        console.log('🚫 Ignoring matchmaker event - already joining a match');
+        return;
+      }
+
+      // Prevent processing if already in a match or no longer have a ticket
+      if (!ticketRef.current || matchRef.current) {
+        console.log('🚫 Ignoring matchmaker event - already in match or no ticket');
+        return;
+      }
+
+      // Prevent processing the same ticket multiple times
+      if (processedTicketsRef.current.has(matched.ticket)) {
+        console.log('🚫 Ignoring matchmaker event - ticket already processed:', matched.ticket);
+        return;
+      }
+
+      // Mark this ticket as processed and set joining state
+      processedTicketsRef.current.add(matched.ticket);
+      isJoiningMatchRef.current = true;
+
+      // Store current ticket for cleanup
+      const currentTicket = ticketRef.current;
 
       try {
         setPhase('joining');
         setStatusMessage('Opponent found! Joining match...');
         setErrorMessage(null);
 
-        const match = await socket.joinMatch(matched.match_id);
+        console.log('🎉 Matchmaker matched event:', {
+          matchId: matched.match_id,
+          hasToken: !!matched.token,
+          ticket: matched.ticket,
+        });
+
+        // Use token-based joining for client-relayed matches
+        let match: Match;
+        if (matched.match_id) {
+          // Server-authoritative match (if Go plugin is working)
+          console.log('🔗 Joining server-authoritative match:', matched.match_id);
+          match = await socket.joinMatch(matched.match_id);
+        } else if (matched.token) {
+          // Client-relayed match with JWT token (current working approach)
+          console.log('🎫 Joining token-based match with token');
+          match = await socket.joinMatch(undefined, matched.token);
+        } else {
+          throw new Error('No match ID or token provided in matchmaker result');
+        }
+
+        console.log('✅ Successfully joined match:', match.match_id);
+        console.log('🔍 Match object structure:', {
+          matchId: match.match_id,
+          hasSelf: !!match.self,
+          selfUserId: match.self?.user_id,
+          presences: match.presences,
+          presencesLength: match.presences?.length,
+        });
+
         if (!isMountedRef.current) {
           try {
             await socket.leaveMatch(match.match_id);
@@ -315,10 +376,12 @@ export const PlayerGameScreen: React.FC = () => {
         }
 
         matchRef.current = match;
-        selfUserIdRef.current = match.self.user_id;
+        selfUserIdRef.current = match.self?.user_id || null;
 
-        const opponentPresence = match.presences.find(
-          (presence) => presence.user_id !== match.self.user_id,
+        // Safely check for opponent presence with proper error handling
+        const presences = match.presences || [];
+        const opponentPresence = presences.find(
+          (presence) => presence.user_id !== match.self?.user_id,
         );
         setOpponentName(opponentPresence?.username ?? null);
         setOpponentConnected(Boolean(opponentPresence));
@@ -326,10 +389,41 @@ export const PlayerGameScreen: React.FC = () => {
         resetBoard();
         setPhase('playing');
         setStatusMessage('Match connected. Waiting for the first move...');
+
+        // IMPORTANT: Stop matchmaking after successfully joining
+        console.log('🛑 Stopping matchmaking - match joined successfully');
+
+        // Mark matchmaking as no longer active
+        isMatchmakingActiveRef.current = false;
+
+        // Clear the ticket ref to prevent further processing
+        ticketRef.current = null;
+
+        // Remove the matchmaking ticket
+        if (currentTicket) {
+          try {
+            await socket.removeMatchmaker(currentTicket.ticket);
+            console.log('✅ Matchmaker ticket removed');
+          } catch (removeError) {
+            console.warn('Failed to remove matchmaker ticket:', removeError);
+          }
+        }
+
+        // Reset joining state
+        isJoiningMatchRef.current = false;
       } catch (error) {
-        console.error('Failed to join authoritative match', error);
+        console.error('Failed to join match:', error);
+        const errorMessage = matched.match_id
+          ? 'Failed to join server-authoritative match. The Go plugin may not be working.'
+          : 'Failed to join token-based match. Please try again.';
+
+        // Reset joining state and matchmaking on error
+        isJoiningMatchRef.current = false;
+        processedTicketsRef.current.delete(matched.ticket);
+        isMatchmakingActiveRef.current = false;
+
         setPhase('error');
-        setErrorMessage('Failed to join the match. Please try again.');
+        setErrorMessage(errorMessage);
         await cleanupMatchmaking();
       }
     },
@@ -340,12 +434,30 @@ export const PlayerGameScreen: React.FC = () => {
     (socket: Socket) => {
       const previousMatchmaker = socket.onmatchmakermatched;
       const previousMatchData = socket.onmatchdata;
+      const previousMatchPresence = socket.onmatchpresence;
       const previousDisconnect = socket.ondisconnect;
 
       socket.onmatchmakermatched = async (matched) => {
-        if (ticketRef.current && matched.ticket === ticketRef.current.ticket) {
-          await handleMatchFound(socket, matched);
+        // Only handle if we have an active ticket and it matches
+        if (!ticketRef.current || matched.ticket !== ticketRef.current.ticket) {
+          console.log('🔄 Ignoring matchmaker event - not our ticket or no active ticket');
+          if (previousMatchmaker) {
+            previousMatchmaker(matched);
+          }
+          return;
         }
+
+        // Additional check for joining state
+        if (isJoiningMatchRef.current) {
+          console.log('🔄 Ignoring matchmaker event - already joining a match');
+          if (previousMatchmaker) {
+            previousMatchmaker(matched);
+          }
+          return;
+        }
+
+        console.log('🎯 Processing matchmaker match for our ticket:', matched.ticket);
+        await handleMatchFound(socket, matched);
 
         if (previousMatchmaker) {
           previousMatchmaker(matched);
@@ -370,6 +482,63 @@ export const PlayerGameScreen: React.FC = () => {
         }
       };
 
+      // Handle match presence changes (players joining/leaving)
+      socket.onmatchpresence = (presence) => {
+        // Guard against Nakama client library errors
+        if (!presence || !matchRef.current || presence.match_id !== matchRef.current.match_id) {
+          if (previousMatchPresence) {
+            try {
+              previousMatchPresence(presence);
+            } catch (error) {
+              console.warn('Previous match presence handler error:', error);
+            }
+          }
+          return;
+        }
+
+        console.log('👥 Match presence update:', {
+          joins: presence.joins?.length || 0,
+          leaves: presence.leaves?.length || 0,
+        });
+
+        // Update opponent information when players join
+        if (presence.joins && presence.joins.length > 0) {
+          const selfUserId = selfUserIdRef.current;
+          const opponent = presence.joins.find((join) => join.user_id !== selfUserId);
+
+          if (opponent) {
+            console.log('🎮 Opponent joined:', opponent.username);
+            setOpponentName(opponent.username ?? null);
+            setOpponentConnected(true);
+
+            // Update status message if we were waiting for opponent
+            if (phase === 'playing') {
+              setStatusMessage('Opponent connected! Game ready to start.');
+            }
+          }
+        }
+
+        // Handle opponent leaving
+        if (presence.leaves && presence.leaves.length > 0) {
+          const selfUserId = selfUserIdRef.current;
+          const opponentLeft = presence.leaves.find((leave) => leave.user_id !== selfUserId);
+
+          if (opponentLeft) {
+            console.log('👋 Opponent left the match');
+            setOpponentConnected(false);
+            setStatusMessage('Opponent disconnected. Waiting for reconnection...');
+          }
+        }
+
+        if (previousMatchPresence) {
+          try {
+            previousMatchPresence(presence);
+          } catch (error) {
+            console.warn('Previous match presence handler error:', error);
+          }
+        }
+      };
+
       socket.ondisconnect = (event) => {
         if (previousDisconnect) {
           previousDisconnect(event);
@@ -385,17 +554,33 @@ export const PlayerGameScreen: React.FC = () => {
       cleanupHandlersRef.current = () => {
         socket.onmatchmakermatched = previousMatchmaker;
         socket.onmatchdata = previousMatchData;
+        socket.onmatchpresence = previousMatchPresence;
         socket.ondisconnect = previousDisconnect;
       };
     },
-    [handleMatchData, handleMatchError, handleMatchFound],
+    [handleMatchData, handleMatchError, handleMatchFound, phase],
   );
 
   const startMatchmaking = React.useCallback(async () => {
+    // Prevent multiple simultaneous matchmaking attempts
+    if (isMatchmakingActiveRef.current) {
+      console.log('🚫 Matchmaking already active, skipping');
+      return;
+    }
+
+    console.log('🚀 Starting new matchmaking session');
+    isMatchmakingActiveRef.current = true;
+
+    // Clean up any existing handlers
     cleanupHandlersRef.current?.();
     cleanupHandlersRef.current = null;
 
+    // Clean up any existing matchmaking state
     await cleanupMatchmaking();
+
+    // Reset state tracking
+    isJoiningMatchRef.current = false;
+    processedTicketsRef.current.clear();
 
     try {
       setPhase('connecting');
@@ -431,12 +616,73 @@ export const PlayerGameScreen: React.FC = () => {
       console.error('Failed to start matchmaking', error);
       setPhase('error');
       setErrorMessage('Unable to connect to matchmaking. Please try again.');
+      isMatchmakingActiveRef.current = false; // Reset state on error
     }
   }, [attachSocketHandlers, cleanupMatchmaking, resetBoard]);
 
   React.useEffect(() => {
     isMountedRef.current = true;
-    startMatchmaking();
+
+    // Only start matchmaking once when component mounts - no dependencies to avoid infinite loops
+    const initializeMatchmaking = async () => {
+      if (isMatchmakingActiveRef.current) {
+        console.log('🚫 Matchmaking already active, skipping initialization');
+        return;
+      }
+
+      console.log('🚀 Starting new matchmaking session');
+      isMatchmakingActiveRef.current = true;
+
+      // Clean up any existing handlers
+      cleanupHandlersRef.current?.();
+      cleanupHandlersRef.current = null;
+
+      // Clean up any existing matchmaking state
+      await cleanupMatchmaking();
+
+      // Reset state tracking
+      isJoiningMatchRef.current = false;
+      processedTicketsRef.current.clear();
+
+      try {
+        setPhase('connecting');
+        setStatusMessage('Connecting to matchmaking...');
+        setErrorMessage(null);
+        resetBoard();
+
+        const socket = await nakamaService.connectSocket();
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        socketRef.current = socket;
+        attachSocketHandlers(socket);
+
+        setPhase('matching');
+        setStatusMessage('Searching for an opponent...');
+
+        const ticket = await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, {
+          mode: MATCH_MODE_CLASSIC,
+        });
+        if (!isMountedRef.current) {
+          try {
+            await socket.removeMatchmaker(ticket.ticket);
+          } catch (error) {
+            console.warn('Failed to remove matchmaking ticket after unmount', error);
+          }
+          return;
+        }
+
+        ticketRef.current = ticket;
+      } catch (error) {
+        console.error('Failed to start matchmaking', error);
+        setPhase('error');
+        setErrorMessage('Unable to connect to matchmaking. Please try again.');
+        isMatchmakingActiveRef.current = false; // Reset state on error
+      }
+    };
+
+    initializeMatchmaking();
 
     return () => {
       isMountedRef.current = false;
@@ -446,7 +692,7 @@ export const PlayerGameScreen: React.FC = () => {
         console.warn('Failed to clean up matchmaking on unmount', error);
       });
     };
-  }, [cleanupMatchmaking, startMatchmaking]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Intentionally empty to run only once on mount
 
   const handleCellPress = React.useCallback(
     (index: number) => {
@@ -480,6 +726,8 @@ export const PlayerGameScreen: React.FC = () => {
   );
 
   const handlePrimaryAction = React.useCallback(async () => {
+    console.log('🏠 Navigating back to home, stopping matchmaking');
+    isMatchmakingActiveRef.current = false;
     await cleanupMatchmaking();
     navigation.navigate('Home');
   }, [cleanupMatchmaking, navigation]);
