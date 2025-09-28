@@ -15,6 +15,12 @@ database:
 session:
   token_expiry_sec: 7200
 
+# Add matchmaker configuration - optimized for 2-player matching
+matchmaker:
+  interval_sec: 5 # Process every 5 seconds (faster than default 15s)
+  max_intervals: 3 # Try 3 times at max before dropping to min
+  max_tickets: 10 # Allow more tickets per player
+
 runtime:
   path: '/nakama/data/modules'
 

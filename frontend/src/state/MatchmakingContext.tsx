@@ -42,7 +42,7 @@ type MatchUpdateKind = 'start' | 'update' | 'complete';
 
 // Constants
 const MATCH_MODE_CLASSIC = 'classic';
-const MATCHMAKER_QUERY = '*'; // Use '*' for token-based matchmaking (built-in Nakama)
+const MATCHMAKER_QUERY = '*'; // Server-authoritative query for Go plugin
 const MATCH_OPCODE_GAME_START = 1;
 const MATCH_OPCODE_BOARD_UPDATE = 2;
 const MATCH_OPCODE_GAME_OVER = 3;
@@ -420,7 +420,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     processedTicketsRef.current.add(ticketId);
     isJoiningMatchRef.current = true;
 
-    console.log('🎯 Match found! Joining match...', matched.token);
+    console.log('🎯 Match found! Joining server-authoritative match...', matched.match_id);
     setPhase('joining');
     setStatusMessage('Match found! Joining...');
 
@@ -431,12 +431,17 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         selfUserIdRef.current = session.user_id || null;
       }
 
-      // Join the match using the token - try with empty match ID and token as second param
-      const match = await socket.joinMatch('', matched.token);
-      matchRef.current = match;
+      // Join the match using the match ID provided by the Go plugin
+      if (matched.match_id) {
+        console.log('🔗 Joining server-authoritative match:', matched.match_id);
+        const match = await socket.joinMatch(matched.match_id);
+        matchRef.current = match;
+      } else {
+        throw new Error('No match ID provided by server-authoritative matchmaker');
+      }
 
-      console.log('✅ Successfully joined match:', match.match_id);
-      console.log('👥 Match participants:', match.presences?.length || 0);
+      console.log('✅ Successfully joined match:', matchRef.current.match_id);
+      console.log('👥 Match participants:', matchRef.current.presences?.length || 0);
 
       // Remove the matchmaker ticket since we found a match
       if (ticketRef.current) {
@@ -569,7 +574,9 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
       setPhase('matching');
       setStatusMessage('Looking for opponents...');
 
-      const ticket = await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2);
+      const ticket = await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, {
+        mode: MATCH_MODE_CLASSIC,
+      });
       ticketRef.current = ticket;
 
       console.log('🎫 Matchmaker ticket created:', ticket.ticket);

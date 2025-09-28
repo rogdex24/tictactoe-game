@@ -34,6 +34,8 @@ export const PlayerGameScreen: React.FC = () => {
     isSendingMove,
     sendMove,
     cleanupMatchmaking,
+    resultLabel,
+    resultTone,
   } = useMatchmaking();
 
   const handleLeaderboard = useCallback(() => {
@@ -69,7 +71,10 @@ export const PlayerGameScreen: React.FC = () => {
   // Determine the current turn's status message
   const statusMessage = useMemo(() => {
     if (phase === 'complete') {
-      // This should be set by the matchmaking context based on the game result
+      // Use the server-provided result label if available
+      if (resultLabel) {
+        return resultLabel;
+      }
       return 'Game Complete';
     }
 
@@ -86,7 +91,7 @@ export const PlayerGameScreen: React.FC = () => {
     } else {
       return 'Opponent Turn';
     }
-  }, [phase, currentTurnMark, yourMark, opponentConnected]);
+  }, [phase, currentTurnMark, yourMark, opponentConnected, resultLabel]);
 
   // Determine active symbol for turn indicator
   const activeSymbol = useMemo(() => {
@@ -102,7 +107,18 @@ export const PlayerGameScreen: React.FC = () => {
   // Determine status color based on game state
   const statusColor = useMemo(() => {
     if (phase === 'complete') {
-      // Determine if player won or lost based on winning cells
+      // Use server-provided result tone for color
+      if (resultTone === 'win') {
+        return yourMark === 'X' ? colors.accentMint : colors.accentTealSoft;
+      } else if (resultTone === 'loss') {
+        return colors.accentDanger;
+      } else if (resultTone === 'draw') {
+        return colors.accentDraw;
+      } else if (resultTone === 'forfeit') {
+        return colors.textSecondary;
+      }
+
+      // Fallback to old logic if no result tone
       if (winningCells) {
         const winningCell = winningCells[0];
         const winningMark = board[winningCell];
@@ -122,7 +138,7 @@ export const PlayerGameScreen: React.FC = () => {
     }
 
     return currentTurnMark === 'X' ? colors.accentMint : colors.textTealHighlight;
-  }, [currentTurnMark, phase, winningCells, board, yourMark, opponentConnected]);
+  }, [currentTurnMark, phase, winningCells, board, yourMark, opponentConnected, resultTone]);
 
   const isGameComplete = phase === 'complete';
 

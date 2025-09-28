@@ -68,12 +68,19 @@ type errorPayload struct {
 
 type TicTacToeMatchHandler struct{}
 
-func (h *TicTacToeMatchHandler) MatchInit(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+func (h *TicTacToeMatchHandler) MatchInit(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+	logger.Info("🎯 TIC-TAC-TOE MATCH INITIALIZING!", "params", params)
+
 	mode := "classic"
 	if rawMode, ok := params["mode"]; ok {
 		if modeValue, ok := rawMode.(string); ok && modeValue != "" {
 			mode = modeValue
+			logger.Info("✅ Match mode extracted", "mode", mode)
+		} else {
+			logger.Warn("⚠️ Failed to extract mode from params", "raw_mode", rawMode)
 		}
+	} else {
+		logger.Warn("⚠️ No mode parameter provided, using default", "default_mode", mode)
 	}
 
 	state := &matchState{
@@ -82,6 +89,7 @@ func (h *TicTacToeMatchHandler) MatchInit(_ context.Context, _ runtime.Logger, _
 		CurrentMark: "X",
 	}
 
+	logger.Info("🏁 Match state initialized", "mode", state.Mode, "current_mark", state.CurrentMark)
 	return state, 1, ""
 }
 
@@ -162,6 +170,10 @@ func (h *TicTacToeMatchHandler) MatchLeave(ctx context.Context, logger runtime.L
 	return gameState
 }
 
+func (h *TicTacToeMatchHandler) MatchTerminate(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, state interface{}, _ int) interface{} {
+	return state
+}
+
 func (h *TicTacToeMatchHandler) MatchLoop(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, messages []runtime.MatchData) interface{} {
 	gameState := state.(*matchState)
 
@@ -175,10 +187,6 @@ func (h *TicTacToeMatchHandler) MatchLoop(ctx context.Context, logger runtime.Lo
 	}
 
 	return gameState
-}
-
-func (h *TicTacToeMatchHandler) MatchTerminate(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, state interface{}, _ int) interface{} {
-	return state
 }
 
 func (h *TicTacToeMatchHandler) MatchSignal(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, state interface{}, _ string) (interface{}, string) {
