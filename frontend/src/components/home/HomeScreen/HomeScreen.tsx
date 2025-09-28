@@ -1,16 +1,16 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Alert, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthCheck } from '../../../hooks/useAuthCheck';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
-import { layout, offsets, spacing } from '../../../styles/dimensions';
+import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
@@ -25,8 +25,18 @@ export const HomeScreen: React.FC = () => {
   const { ensureAuthenticated, isAuthLoading } = useAuthCheck();
   const trimmedName = playerName.trim();
   const hasPlayerName = trimmedName.length > 0;
+  const [selectedMode, setSelectedMode] = useState<'bot' | 'player'>('bot');
+  const isBotMode = selectedMode === 'bot';
 
   const handleStart = async () => {
+    if (!isBotMode) {
+      Alert.alert(
+        'Multiplayer Coming Soon',
+        'Online player matchmaking is on the way. Please choose Bot Mode to play against the computer for now.',
+      );
+      return;
+    }
+
     // If no player name, go to player name screen first
     if (!hasPlayerName) {
       navigation.navigate('PlayerName', { nextScreen: 'MatchLoading' });
@@ -98,10 +108,57 @@ export const HomeScreen: React.FC = () => {
             <GameIcons />
           </View>
           <View style={styles.ctaArea}>
+            <View style={styles.modeToggleContainer}>
+              <Text style={[typography.bodyPrimary, styles.modeToggleLabel]}>Choose a mode</Text>
+              <View style={styles.modeToggle}>
+                <Pressable
+                  accessibilityLabel="Play against the bot"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isBotMode }}
+                  onPress={() => setSelectedMode('bot')}
+                  style={({ pressed }) => [
+                    styles.modeOption,
+                    isBotMode && styles.modeOptionActive,
+                    pressed && styles.modeOptionPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.buttonPrimary,
+                      styles.modeOptionText,
+                      isBotMode && styles.modeOptionTextActive,
+                    ]}
+                  >
+                    Bot Mode
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Play against other players"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isBotMode }}
+                  onPress={() => setSelectedMode('player')}
+                  style={({ pressed }) => [
+                    styles.modeOption,
+                    !isBotMode && styles.modeOptionActive,
+                    pressed && styles.modeOptionPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.buttonPrimary,
+                      styles.modeOptionText,
+                      !isBotMode && styles.modeOptionTextActive,
+                    ]}
+                  >
+                    Player Mode
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
             <CustomButton
-              label={isAuthLoading ? 'Connecting...' : 'Start Game'}
+              label={isAuthLoading && isBotMode ? 'Connecting...' : 'Start Game'}
               onPress={handleStart}
-              disabled={isAuthLoading}
+              disabled={isAuthLoading && isBotMode}
             />
             <TextButton
               label="View Leaderboard"
@@ -194,6 +251,48 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingTop: spacing.xl,
     zIndex: 1,
+  },
+  modeToggleContainer: {
+    marginBottom: spacing.lg,
+  },
+  modeToggleLabel: {
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceOverlay,
+    borderRadius: radius.pill,
+    padding: 4,
+    gap: 4,
+  },
+  modeOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    backgroundColor: 'transparent',
+  },
+  modeOptionPressed: {
+    backgroundColor: colors.borderTealSoft,
+  },
+  modeOptionActive: {
+    backgroundColor: colors.accentTealOverlay,
+    borderWidth: 1,
+    borderColor: colors.accentTealBorder,
+    shadowColor: colors.accentTeal,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modeOptionText: {
+    color: colors.textSecondary,
+  },
+  modeOptionTextActive: {
+    color: colors.textPrimary,
   },
   leaderboardButton: {
     marginTop: spacing.sm,
