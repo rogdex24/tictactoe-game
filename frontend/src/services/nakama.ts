@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { Client, Session } from '@heroiclabs/nakama-js';
+import { Client, Session, Socket } from '@heroiclabs/nakama-js';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
@@ -102,6 +102,8 @@ async function getOrCreateDeviceId(): Promise<string> {
 class NakamaService {
   private client: Client;
   private currentSession: Session | null = null;
+  private socket: Socket | null = null;
+  private socketPromise: Promise<Socket> | null = null;
 
   constructor() {
     this.client = new Client(
@@ -117,6 +119,62 @@ class NakamaService {
    */
   getSession(): Session | null {
     return this.currentSession;
+  }
+
+  /**
+   * Get the active realtime socket, connecting if necessary.
+   */
+  async connectSocket(): Promise<Socket> {
+    if (!this.currentSession) {
+      throw new Error('No active session. Please authenticate first.');
+    }
+
+    if (this.socket) {
+      return this.socket;
+    }
+
+    if (this.socketPromise) {
+      return this.socketPromise;
+    }
+
+    const socket = this.client.createSocket(NAKAMA_USE_SSL, false);
+
+    const connectPromise = socket
+      .connect(this.currentSession, true)
+      .then(() => {
+        socket.ondisconnect = () => {
+          this.socket = null;
+          this.socketPromise = null;
+        };
+        socket.onerror = () => {
+          this.socket = null;
+        };
+
+        this.socket = socket;
+        this.socketPromise = null;
+        return socket;
+      })
+      .catch((error) => {
+        this.socketPromise = null;
+        throw error;
+      });
+
+    this.socketPromise = connectPromise;
+    return connectPromise;
+  }
+
+  /**
+   * Disconnect the realtime socket if it's connected.
+   */
+  async disconnectSocket(): Promise<void> {
+    if (this.socket) {
+      try {
+        this.socket.disconnect();
+      } finally {
+        this.socket = null;
+        this.socketPromise = null;
+      }
+    }
   }
 
   /**

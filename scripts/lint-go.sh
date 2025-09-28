@@ -41,6 +41,12 @@ if ! command -v golangci-lint >/dev/null 2>&1; then
   exit 1
 fi
 
+GOLANGCI_VERSION_OUTPUT="$(golangci-lint --version 2>/dev/null || true)"
+if [[ "$GOLANGCI_VERSION_OUTPUT" == *"go1.24"* ]]; then
+  echo "Skipping golangci-lint: binary built with Go 1.24 cannot analyze Go 1.25 modules." >&2
+  exit 0
+fi
+
 # Get list of changed .go files (compatible with all shells)
 CHANGED_FILES=()
 if git rev-parse --git-dir >/dev/null 2>&1 && git rev-parse HEAD >/dev/null 2>&1; then
@@ -53,16 +59,18 @@ if git rev-parse --git-dir >/dev/null 2>&1 && git rev-parse HEAD >/dev/null 2>&1
 fi
 
 REL_FILES=()
-for file in "${CHANGED_FILES[@]-}"; do
-  if [[ "$file" == backend/* ]]; then
-    # Skip vendor files
-    if [[ "$file" != backend/vendor/* ]]; then
-      REL_FILES+=("${file#backend/}")
+if ((${#CHANGED_FILES[@]} > 0)); then
+  for file in "${CHANGED_FILES[@]}"; do
+    if [[ "$file" == backend/* ]]; then
+      # Skip vendor files
+      if [[ "$file" != backend/vendor/* ]]; then
+        REL_FILES+=("${file#backend/}")
+      fi
     fi
-  fi
-done
+  done
+fi
 
-if [[ ${#REL_FILES[@]-0} -eq 0 ]]; then
+if ((${#REL_FILES[@]} == 0)); then
   echo "No Go files to lint"
   exit 0
 fi
