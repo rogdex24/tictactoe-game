@@ -26,9 +26,11 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 const MATCH_MODE_CLASSIC = 'classic';
 const MATCHMAKER_QUERY = '+mode:classic';
-const MATCH_OPCODE_STATE = 1;
-const MATCH_OPCODE_MOVE = 2;
-const MATCH_OPCODE_ERROR = 3;
+const MATCH_OPCODE_GAME_START = 1;
+const MATCH_OPCODE_BOARD_UPDATE = 2;
+const MATCH_OPCODE_GAME_OVER = 3;
+const MATCH_OPCODE_PLAYER_MOVE = 4;
+const MATCH_OPCODE_ERROR = 5;
 
 const createEmptyBoard = (): (PlayerMark | null)[] => Array(9).fill(null);
 
@@ -60,6 +62,8 @@ type ServerMatchState = {
 type ErrorPayload = {
   message?: string;
 };
+
+type MatchUpdateKind = 'start' | 'update' | 'complete';
 
 const decodeMatchData = (data: Uint8Array | string): string => {
   if (typeof data === 'string') {
@@ -175,7 +179,7 @@ export const PlayerGameScreen: React.FC = () => {
     setIsSendingMove(false);
   }, []);
 
-  const handleMatchState = React.useCallback((payload: ServerMatchState) => {
+  const handleMatchState = React.useCallback((payload: ServerMatchState, kind: MatchUpdateKind) => {
     const incomingBoard = payload.board ?? [];
     const nextBoard = Array.from({ length: 9 }, (_, index) => {
       const value = incomingBoard[index];
@@ -201,7 +205,9 @@ export const PlayerGameScreen: React.FC = () => {
     setIsSendingMove(false);
     setErrorMessage(null);
 
-    if (payload.isComplete) {
+    const isComplete = Boolean(payload.isComplete) || kind === 'complete';
+
+    if (isComplete) {
       setPhase('complete');
 
       const isWinner = payload.winnerUserId && payload.winnerUserId === selfUserId;
@@ -242,12 +248,24 @@ export const PlayerGameScreen: React.FC = () => {
       setResultTone(null);
 
       if (!opponent || !opponent.connected) {
-        setStatusMessage('Waiting for an opponent to connect...');
+        setStatusMessage(
+          kind === 'start'
+            ? 'Waiting for opponent to connect...'
+            : 'Waiting for an opponent to connect...',
+        );
       } else if (myAssignment?.mark && normalizedCurrentMark === myAssignment.mark) {
-        setStatusMessage('Your turn to play.');
+        if (kind === 'start') {
+          setStatusMessage('Match started. Your turn!');
+        } else {
+          setStatusMessage('Your turn to play.');
+        }
       } else {
         const opponentLabel = opponent.username?.trim().length ? opponent.username : 'opponent';
-        setStatusMessage(`Waiting for ${opponentLabel} to move...`);
+        if (kind === 'start') {
+          setStatusMessage(`${opponentLabel} moves first.`);
+        } else {
+          setStatusMessage(`Waiting for ${opponentLabel} to move...`);
+        }
       }
     }
   }, []);
@@ -258,7 +276,14 @@ export const PlayerGameScreen: React.FC = () => {
 
       try {
         const payload = JSON.parse(decoded) as ServerMatchState;
-        handleMatchState(payload);
+
+        if (message.op_code === MATCH_OPCODE_GAME_START) {
+          handleMatchState(payload, 'start');
+        } else if (message.op_code === MATCH_OPCODE_BOARD_UPDATE) {
+          handleMatchState(payload, 'update');
+        } else if (message.op_code === MATCH_OPCODE_GAME_OVER) {
+          handleMatchState(payload, 'complete');
+        }
       } catch (error) {
         console.warn('Failed to parse match state payload', error);
       }
@@ -329,7 +354,11 @@ export const PlayerGameScreen: React.FC = () => {
 
       socket.onmatchdata = (message) => {
         if (matchRef.current && message.match_id === matchRef.current.match_id) {
-          if (message.op_code === MATCH_OPCODE_STATE) {
+          if (
+            message.op_code === MATCH_OPCODE_GAME_START ||
+            message.op_code === MATCH_OPCODE_BOARD_UPDATE ||
+            message.op_code === MATCH_OPCODE_GAME_OVER
+          ) {
             handleMatchData(message);
           } else if (message.op_code === MATCH_OPCODE_ERROR) {
             handleMatchError(message);
@@ -440,7 +469,7 @@ export const PlayerGameScreen: React.FC = () => {
       const payload = JSON.stringify({ index });
 
       socketRef.current
-        .sendMatchState(matchRef.current.match_id, MATCH_OPCODE_MOVE, payload)
+        .sendMatchState(matchRef.current.match_id, MATCH_OPCODE_PLAYER_MOVE, payload)
         .catch((error) => {
           console.error('Failed to submit move', error);
           setErrorMessage('Failed to submit move. Please try again.');

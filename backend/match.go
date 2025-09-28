@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	opcodeMatchState int64 = 1
-	opcodeMakeMove   int64 = 2
-	opcodeError      int64 = 3
+	opcodeGameStart   int64 = 1
+	opcodeBoardUpdate int64 = 2
+	opcodeGameOver    int64 = 3
+	opcodePlayerMove  int64 = 4
+	opcodeError       int64 = 5
 )
 
 type playerSlot struct {
@@ -34,6 +36,7 @@ type matchState struct {
 	WinningCells []int
 	Completed    bool
 	Result       string
+	Started      bool
 }
 
 type matchStatePayload struct {
@@ -79,7 +82,7 @@ func (h *TicTacToeMatchHandler) MatchInit(_ context.Context, _ runtime.Logger, _
 		CurrentMark: "X",
 	}
 
-	return state, 5, ""
+	return state, 1, ""
 }
 
 func (h *TicTacToeMatchHandler) MatchJoinAttempt(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, state interface{}, presence runtime.Presence, _ map[string]string) (interface{}, bool, string) {
@@ -118,7 +121,13 @@ func (h *TicTacToeMatchHandler) MatchJoin(ctx context.Context, logger runtime.Lo
 		player.Connected = true
 	}
 
-	h.broadcastState(ctx, logger, dispatcher, gameState)
+	h.broadcastBoardState(ctx, logger, dispatcher, gameState)
+
+	if len(gameState.Players) == 2 && !gameState.Started {
+		gameState.Started = true
+		h.broadcastGameStart(ctx, logger, dispatcher, gameState)
+	}
+
 	return gameState
 }
 
@@ -143,7 +152,13 @@ func (h *TicTacToeMatchHandler) MatchLeave(ctx context.Context, logger runtime.L
 		}
 	}
 
-	h.broadcastState(ctx, logger, dispatcher, gameState)
+	if gameState.Completed {
+		h.broadcastBoardState(ctx, logger, dispatcher, gameState)
+		h.broadcastGameOver(ctx, logger, dispatcher, gameState)
+	} else {
+		h.broadcastBoardState(ctx, logger, dispatcher, gameState)
+	}
+
 	return gameState
 }
 
@@ -152,7 +167,7 @@ func (h *TicTacToeMatchHandler) MatchLoop(ctx context.Context, logger runtime.Lo
 
 	for _, message := range messages {
 		switch message.GetOpCode() {
-		case opcodeMakeMove:
+		case opcodePlayerMove:
 			h.handleMove(ctx, logger, dispatcher, gameState, message)
 		default:
 			logger.Warn("Received unsupported opcode", "op_code", message.GetOpCode())
@@ -237,7 +252,11 @@ func (h *TicTacToeMatchHandler) handleMove(ctx context.Context, logger runtime.L
 		}
 	}
 
-	h.broadcastState(ctx, logger, dispatcher, state)
+	h.broadcastBoardState(ctx, logger, dispatcher, state)
+
+	if state.Completed {
+		h.broadcastGameOver(ctx, logger, dispatcher, state)
+	}
 }
 
 func (h *TicTacToeMatchHandler) sendError(dispatcher runtime.MatchDispatcher, recipient runtime.Presence, message string) {
@@ -249,7 +268,19 @@ func (h *TicTacToeMatchHandler) sendError(dispatcher runtime.MatchDispatcher, re
 	_ = dispatcher.BroadcastMessage(opcodeError, payload, []runtime.Presence{recipient}, nil, true)
 }
 
-func (h *TicTacToeMatchHandler) broadcastState(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, state *matchState) {
+func (h *TicTacToeMatchHandler) broadcastGameStart(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, state *matchState) {
+	h.broadcastState(ctx, logger, dispatcher, opcodeGameStart, state)
+}
+
+func (h *TicTacToeMatchHandler) broadcastBoardState(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, state *matchState) {
+	h.broadcastState(ctx, logger, dispatcher, opcodeBoardUpdate, state)
+}
+
+func (h *TicTacToeMatchHandler) broadcastGameOver(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, state *matchState) {
+	h.broadcastState(ctx, logger, dispatcher, opcodeGameOver, state)
+}
+
+func (h *TicTacToeMatchHandler) broadcastState(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, opcode int64, state *matchState) {
 	players := make([]matchPlayerDTO, 0, len(state.Players))
 	for userID, slot := range state.Players {
 		players = append(players, matchPlayerDTO{
@@ -281,7 +312,7 @@ func (h *TicTacToeMatchHandler) broadcastState(ctx context.Context, logger runti
 		return
 	}
 
-	if err := dispatcher.BroadcastMessage(opcodeMatchState, encoded, nil, nil, true); err != nil {
+	if err := dispatcher.BroadcastMessage(opcode, encoded, nil, nil, true); err != nil {
 		logger.Error("Failed to broadcast match state", "error", err)
 	}
 }
