@@ -29,28 +29,22 @@ export const HomeScreen: React.FC = () => {
   const isBotMode = selectedMode === 'bot';
 
   const handleStart = async () => {
-    if (!isBotMode) {
-      Alert.alert(
-        'Multiplayer Coming Soon',
-        'Online player matchmaking is on the way. Please choose Bot Mode to play against the computer for now.',
-      );
-      return;
-    }
+    const nextScreen = isBotMode ? 'MatchLoading' : 'PlayerGame';
 
-    // If no player name, go to player name screen first
     if (!hasPlayerName) {
-      navigation.navigate('PlayerName', { nextScreen: 'MatchLoading' });
+      navigation.navigate('PlayerName', { nextScreen });
       return;
     }
 
-    // Ensure user is authenticated before starting game
     try {
       await ensureAuthenticated();
-      navigation.navigate('MatchLoading');
+      navigation.navigate(nextScreen);
     } catch (error) {
       Alert.alert(
-        'Authentication Required',
-        'Unable to authenticate. Please check your connection and try again.',
+        isBotMode ? 'Authentication Required' : 'Multiplayer Sign-in Needed',
+        isBotMode
+          ? 'Unable to authenticate. Please check your connection and try again.'
+          : 'Unable to prepare your multiplayer session. Please check your connection and try again.',
         [
           {
             text: 'Retry',
@@ -156,9 +150,9 @@ export const HomeScreen: React.FC = () => {
               </View>
             </View>
             <CustomButton
-              label={isAuthLoading && isBotMode ? 'Connecting...' : 'Start Game'}
+              label={isAuthLoading ? 'Connecting...' : 'Start Game'}
               onPress={handleStart}
-              disabled={isAuthLoading && isBotMode}
+              disabled={isAuthLoading}
             />
             <TextButton
               label="View Leaderboard"

@@ -1,5 +1,5 @@
 export type PlayerNameScreenParams = {
-  nextScreen?: 'Home' | 'MatchLoading';
+  nextScreen?: 'Home' | 'MatchLoading' | 'PlayerGame';
 };
 
 export type RootStackParamList = {
@@ -7,6 +7,7 @@ export type RootStackParamList = {
   PlayerName: PlayerNameScreenParams | undefined;
   MatchLoading: undefined;
   Game: undefined;
+  PlayerGame: undefined;
   Leaderboard: undefined;
 };
 
