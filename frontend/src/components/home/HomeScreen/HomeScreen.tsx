@@ -29,16 +29,18 @@ export const HomeScreen: React.FC = () => {
   const isBotMode = selectedMode === 'bot';
 
   const handleStart = async () => {
-    const nextScreen = isBotMode ? 'MatchLoading' : 'PlayerGame';
-
     if (!hasPlayerName) {
-      navigation.navigate('PlayerName', { nextScreen });
+      if (isBotMode) {
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'bot' });
+      } else {
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'player' });
+      }
       return;
     }
 
     try {
       await ensureAuthenticated();
-      navigation.navigate(nextScreen);
+      navigation.navigate('MatchLoading', { mode: isBotMode ? 'bot' : 'player' });
     } catch (error) {
       Alert.alert(
         isBotMode ? 'Authentication Required' : 'Multiplayer Sign-in Needed',

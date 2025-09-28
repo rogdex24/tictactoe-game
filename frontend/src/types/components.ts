@@ -1,11 +1,12 @@
 export type PlayerNameScreenParams = {
   nextScreen?: 'Home' | 'MatchLoading' | 'PlayerGame';
+  mode?: 'bot' | 'player'; // For when nextScreen is 'MatchLoading'
 };
 
 export type RootStackParamList = {
   Home: undefined;
   PlayerName: PlayerNameScreenParams | undefined;
-  MatchLoading: undefined;
+  MatchLoading: { mode: 'bot' | 'player' };
   Game: undefined;
   PlayerGame: undefined;
   Leaderboard: undefined;

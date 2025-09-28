@@ -8,6 +8,90 @@ These conventions apply to all files within the `frontend/` directory. Follow th
 
 The Expo React Native client renders the multiplayer Tic-Tac-Toe experience. Screens should follow the design system defined in `src/styles` and remain compatible with iOS, Android, and web builds. The app now integrates with Nakama server for authentication and user management.
 
+## Navigation Overview
+
+```mermaid
+graph TD
+  A[App Launch\nfonts loaded] --> B[Home Screen]
+  B -->|Start Game · Bot mode| C{Has saved name?}
+  C -->|No| D[PlayerName\nnext: MatchLoading bot]
+  D --> E[MatchLoading bot]
+  C -->|Yes| E
+  E -->|Auth OK| F[Game vs CPU]
+  E -->|Cancel| B
+  F -->|Play Again| F
+  F -->|Leave Game| B
+  F -->|Leaderboard CTA| L[Leaderboard]
+  B -->|Start Game · Player mode| G{Has saved name?}
+  G -->|No| H[PlayerName\nnext: MatchLoading player]
+  H --> I[MatchLoading player]
+  G -->|Yes| I
+  I -->|Match found| J[PlayerGame]
+  I -->|Cancel| B
+  J -->|Leave or Match complete| B
+  J -->|Retry action| B
+  B -->|Edit name icon| K[PlayerName\nnext: Home]
+  K --> B
+  B -->|View Leaderboard| L
+  L -->|Back CTA| B
+```
+
+## Screen Reference Cheat Sheet
+
+\*\*HomeScreen.tsx (`frontend/src/components/home/HomeScreen/HomeScreen.tsx`)
+
+- Purpose: Landing lobby to choose bot or multiplayer, surface greeting, and link to leaderboard.
+- Routes: Starts PlayerName when no name or editing, otherwise pushes MatchLoading with the selected mode, and opens Leaderboard via CTA (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:31`, `:64`).
+- Components: `BackgroundGlow`, `GameIcons`, `CustomButton`, `IconButton`, `TextButton` (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:16-20`).
+- Shared state/services: Reads `playerName` from `usePlayer` and `ensureAuthenticated`/`isAuthLoading` from `useAuthCheck` before navigation (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:24-43`).
+- Caveats: Always await `ensureAuthenticated` so MatchLoading receives a valid session; keep the trimmed-name guard to avoid empty identifiers when users enter only whitespace.
+
+\*\*PlayerNameScreen.tsx (`frontend/src/components/onboarding/PlayerNameScreen/PlayerNameScreen.tsx`)
+
+- Purpose: Collect or update the player display name and trigger authentication when needed.
+- Routes: Uses `nextScreen` to return to Home, resume MatchLoading, or jump into PlayerGame after updates (`frontend/src/components/onboarding/PlayerNameScreen/PlayerNameScreen.tsx:58-78`).
+- Components: `BackButton`, `CustomButton`, `BackgroundGlow`, `TextInput` shell for the name form (`frontend/src/components/onboarding/PlayerNameScreen/PlayerNameScreen.tsx:14-16`, `:103-127`).
+- Shared state/services: Pulls setters and auth helpers from `usePlayer`, switching between `updatePlayerName`, `authenticate`, and local state sync (`frontend/src/components/onboarding/PlayerNameScreen/PlayerNameScreen.tsx:21-53`).
+- Caveats: Preserve the optimistic navigation even on auth failure because follow-up screens re-check; ensure new flows pass `mode` when targeting MatchLoading so multiplayer paths pick the right provider.
+
+\*\*MatchLoadingScreen.tsx (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx`)
+
+- Purpose: Bridge between lobby and gameplay, either spinning up a bot match or waiting for multiplayer matchmaking to complete.
+- Routes: Bot mode jumps straight to Game after auth; player mode waits for `phase` to become `playing` before navigating to PlayerGame, and both variants cancel back to Home (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:31-37`, `:96-137`).
+- Components: `MatchStatusCard`, `LoadingSpinner`, `CustomButton`, `BackgroundGlow` wrappers for status UX (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:16-19`, `:74-89`, `:154-160`).
+- Shared state/services: Uses `usePlayer` and `useAuthCheck` for identity and auth; player mode also consumes `useMatchmaking` actions like `startMatchmaking` and `cleanupMatchmaking` (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:24-55`).
+- Caveats: Avoid double-starting matchmaking—`startMatchmaking` is idempotent but gated by refs; if you relocate the provider higher in the tree, ensure `cleanupMatchmaking` still runs on cancel to release tickets and sockets.
+
+\*\*GameScreen.tsx (`frontend/src/components/game/GameScreen/GameScreen.tsx`)
+
+- Purpose: Local bot match with client-side rules, board evaluation, and rematch controls.
+- Routes: Enters from MatchLoading (bot path), reopens in-place for Play Again, and navigates to Home or Leaderboard via footer CTAs (`frontend/src/components/game/GameScreen/GameScreen.tsx:56-83`, `:194-203`).
+- Components: `GameBoard`, `GameSymbol`, `CustomButton`, `TextButton`, `BackgroundGlow` for board and actions (`frontend/src/components/game/GameScreen/GameScreen.tsx:14-18`, `:178-203`).
+- Shared state/services: Reads `playerName` from `usePlayer` only for labeling; game logic is entirely local state (`frontend/src/components/game/GameScreen/GameScreen.tsx:52-123`).
+- Caveats: Keep `resetGame` memoized so effects that depend on it (initial reset and leave-game cleanup) do not loop; if you add async bot logic, guard the existing synchronous evaluation order.
+
+\*\*PlayerGameScreen.tsx (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`)
+
+- Purpose: Multiplayer match UI driven by live Nakama updates from `MatchmakingContext`.
+- Routes: Landed from MatchLoading once a match is ready; primary button returns to Home while optionally retrying on errors (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:52-124`).
+- Components: `MatchStatusCard`, `GameBoard`, `CustomButton`, `TextButton`, `BackgroundGlow` (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:15-19`, `:99-125`).
+- Shared state/services: Leans on `useMatchmaking` for board state, marks, connectivity, and actions plus `usePlayer` for display name (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:27-118`).
+- Caveats: `sendMove` short-circuits unless it is your turn and the opponent is connected—surface UX for disabled board states instead of bypassing the guard; remember that App.tsx wraps this route with its own `MatchmakingProvider`, so share state via services (or lift the provider) if you need continuity from MatchLoading.
+
+\*\*LeaderboardScreen.tsx (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx`)
+
+- Purpose: Static leaderboard showcase with a simple list and back CTA.
+- Routes: Reached from Home or Game; both Back and Play Again buttons return to Home (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:91-138`).
+- Components: `BackButton`, `CustomButton`, `BackgroundGlow`, `FlatList` renderer for entries (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:13-137`).
+- Shared state/services: No global context usage beyond navigation—data is currently mock data local to the screen.
+- Caveats: Replace the hard-coded dataset with service data in one place so the shape stays aligned with backend responses; maintain consistent key/score fields when wiring Nakama RPCs.
+
+## Shared State Touchpoints
+
+- `PlayerContext` (`frontend/src/state/PlayerContext.tsx:21-123`) owns the player name, session, and auth helpers consumed by Home, PlayerName, MatchLoading, Game, and PlayerGame; always run mutations (`setPlayerName`, `authenticate`, `updatePlayerName`) through the context so SecureStore/localStorage stay in sync.
+- `MatchmakingContext` (`frontend/src/state/MatchmakingContext.tsx:63-264`) wraps the multiplayer socket lifecycle. Both MatchLoading (player mode) and PlayerGame depend on it for match phases, board state, and cleanup. Keep the provider lifetime consistent if you refactor navigation; otherwise hoist it to the navigator level.
+- `useAuthCheck` (`frontend/src/hooks/useAuthCheck.ts:6-33`) is the lightweight gate before any networked flow. Call `ensureAuthenticated` prior to invoking Nakama services to avoid cascading failures from expired sessions.
+
 ## Authentication Architecture
 
 ### Overview

@@ -28,6 +28,7 @@ export const PlayerNameScreen: React.FC = () => {
   } = usePlayer();
   const [name, setName] = React.useState(playerName);
   const nextScreen = route.params?.nextScreen ?? 'MatchLoading';
+  const mode = route.params?.mode;
 
   React.useEffect(() => {
     setName(playerName);
@@ -54,11 +55,30 @@ export const PlayerNameScreen: React.FC = () => {
         setPlayerName(nextName);
       }
 
-      navigation.navigate(nextScreen);
+      // Navigate to the appropriate screen with proper parameters
+      if (nextScreen === 'MatchLoading' && mode) {
+        navigation.navigate('MatchLoading', { mode });
+      } else if (nextScreen === 'Home') {
+        navigation.navigate('Home');
+      } else if (nextScreen === 'PlayerGame') {
+        navigation.navigate('PlayerGame');
+      } else {
+        // Default to MatchLoading with 'player' mode if no mode specified
+        navigation.navigate('MatchLoading', { mode: 'player' });
+      }
     } catch (error) {
       console.error('Failed to update name or authenticate:', error);
       // Still navigate but user might not be authenticated - will be handled in game flow
-      navigation.navigate(nextScreen);
+      if (nextScreen === 'MatchLoading' && mode) {
+        navigation.navigate('MatchLoading', { mode });
+      } else if (nextScreen === 'Home') {
+        navigation.navigate('Home');
+      } else if (nextScreen === 'PlayerGame') {
+        navigation.navigate('PlayerGame');
+      } else {
+        // Default to MatchLoading with 'player' mode if no mode specified
+        navigation.navigate('MatchLoading', { mode: 'player' });
+      }
     }
   };
 

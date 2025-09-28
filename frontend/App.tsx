@@ -12,6 +12,7 @@ import { LeaderboardScreen } from './src/components/leaderboard/LeaderboardScree
 import { MatchLoadingScreen } from './src/components/onboarding/MatchLoadingScreen';
 import { PlayerNameScreen } from './src/components/onboarding/PlayerNameScreen';
 import { PlayerGameScreen } from './src/components/player/PlayerGameScreen';
+import { MatchmakingProvider } from './src/state/MatchmakingContext';
 import { PlayerProvider } from './src/state/PlayerContext';
 import type { RootStackParamList } from './src/types/components';
 
@@ -43,16 +44,18 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <PlayerProvider>
-        <NavigationContainer>
-          <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
-            <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
-            <Stack.Screen name="Game" component={GameScreen} />
-            <Stack.Screen name="PlayerGame" component={PlayerGameScreen} />
-            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
+        <MatchmakingProvider>
+          <NavigationContainer>
+            <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="PlayerName" component={PlayerNameScreen} />
+              <Stack.Screen name="MatchLoading" component={MatchLoadingScreen} />
+              <Stack.Screen name="Game" component={GameScreen} />
+              <Stack.Screen name="PlayerGame" component={PlayerGameScreen} />
+              <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </MatchmakingProvider>
       </PlayerProvider>
     </SafeAreaProvider>
   );

@@ -360,6 +360,43 @@ class NakamaService {
       throw error;
     }
   }
+
+  /**
+   * Get user info by user IDs (display names, usernames, etc.)
+   */
+  async getUsers(userIds: string[]) {
+    if (!this.currentSession) {
+      throw new Error('No active session. Please authenticate first.');
+    }
+
+    try {
+      return await this.client.getUsers(this.currentSession, userIds);
+    } catch (error) {
+      console.error('Failed to get users info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the current socket connection if available
+   */
+  getSocket(): Socket | null {
+    return this.socket;
+  }
+
+  /**
+   * Check if socket is connected and ready
+   */
+  isSocketConnected(): boolean {
+    return this.socket !== null;
+  }
+
+  /**
+   * Create a socket without connecting (for advanced usage)
+   */
+  createSocket(useSSL?: boolean, verbose?: boolean): Socket {
+    return this.client.createSocket(useSSL ?? NAKAMA_USE_SSL, verbose ?? false);
+  }
 }
 
 // Export singleton instance

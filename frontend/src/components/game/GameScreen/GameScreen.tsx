@@ -172,7 +172,6 @@ export const GameScreen: React.FC = () => {
               <Text style={[styles.matchupText, styles.matchupOpponent]}>{opponentName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (OPP)</Text>
             </View>
-            <Text style={styles.scoreText}>3 - 2</Text>
           </View>
           <View style={styles.body}>
             <View style={styles.turnIndicator}>
