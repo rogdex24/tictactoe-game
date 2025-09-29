@@ -120,11 +120,34 @@ update_nginx_config() {
     # Restore original nginx.conf
     if [ -f nginx.conf.backup ]; then
         mv nginx.conf.backup nginx.conf
+        echo "✅ Original nginx.conf restored"
     fi
     
-    # Reload nginx with new certificates (without sudo)
-    docker compose exec nginx nginx -s reload
-    echo "✅ Nginx configuration updated"
+    # Verify the configuration has the correct certificate paths
+    if grep -q "/etc/nginx/ssl/" nginx.conf; then
+        echo "⚠️  Configuration still has self-signed certificate paths, fixing..."
+        sed -i.tmp "s|/etc/nginx/ssl/fullchain.pem|/etc/letsencrypt/live/$DOMAIN/fullchain.pem|g" nginx.conf
+        sed -i.tmp "s|/etc/nginx/ssl/privkey.pem|/etc/letsencrypt/live/$DOMAIN/privkey.pem|g" nginx.conf
+        rm -f nginx.conf.tmp
+        echo "✅ Certificate paths updated"
+    fi
+    
+    # Test nginx configuration
+    if docker compose exec nginx nginx -t; then
+        echo "✅ Nginx configuration is valid"
+    else
+        echo "❌ Nginx configuration has errors"
+        return 1
+    fi
+    
+    # Restart nginx to ensure it loads the new certificate
+    echo "🔄 Restarting nginx to load Let's Encrypt certificate..."
+    docker compose restart nginx
+    
+    # Wait for nginx to start
+    sleep 10
+    
+    echo "✅ Nginx restarted with Let's Encrypt certificate"
 }
 
 # Function to setup certificate renewal
