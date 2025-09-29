@@ -163,7 +163,11 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     setOpponentConnected(false);
     setMode(MATCH_MODE_CLASSIC);
     setErrorMessage(null);
-    setIsMatchmakingRequested(false); // Clear matchmaking intent
+    setIsMatchmakingRequested(false); // Clear matchmaking intent.
+    // It is critical to reset this flag here to ensure that after a full state reset,
+    // matchmaking is not automatically re-initiated. This guarantees that matchmaking
+    // will only start again if the user explicitly requests it, preventing unintended
+    // automatic matchmaking and keeping state transitions predictable.
 
     // Clear any stale processed tickets
     processedTicketsRef.current.clear();
