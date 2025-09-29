@@ -5,6 +5,7 @@ import React from 'react';
 import { colors } from '../../../styles/colors';
 import { radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
+import { getDisplayName, isValidGameMode } from '../../../types/game';
 
 type MatchPhase = 'connecting' | 'matching' | 'joining' | 'playing' | 'complete' | 'error';
 type ResultTone = 'win' | 'loss' | 'draw' | 'forfeit';
@@ -47,8 +48,28 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
   errorMessage,
   showSpinner = true,
 }) => {
+  // Log mode display information for debugging
+  React.useEffect(() => {
+    console.log('📊 MatchStatusCard render:', {
+      phase,
+      mode,
+      statusMessage,
+      opponentName,
+      opponentConnected,
+      resultLabel,
+      resultTone,
+    });
+  }, [phase, mode, statusMessage, opponentName, opponentConnected, resultLabel, resultTone]);
+
   const isLoadingPhase = phase === 'connecting' || phase === 'matching' || phase === 'joining';
   const resultColor = toneToColor(resultTone ?? null);
+
+  // Log mode formatting
+  const displayMode = isValidGameMode(mode) ? getDisplayName(mode) : mode || 'Classic';
+  console.log('🎮 Mode display formatting:', {
+    rawMode: mode,
+    displayMode: displayMode,
+  });
 
   return (
     <View style={styles.statusCard}>
@@ -72,9 +93,7 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
         </View>
         <View style={styles.metaItem}>
           <Text style={[typography.bodyPrimary, styles.metaLabel]}>Mode</Text>
-          <Text style={[typography.bodyPrimary, styles.metaValueText]}>
-            {mode === 'classic' ? 'Classic' : mode}
-          </Text>
+          <Text style={[typography.bodyPrimary, styles.metaValueText]}>{displayMode}</Text>
         </View>
       </View>
 

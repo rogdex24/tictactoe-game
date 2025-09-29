@@ -9,6 +9,8 @@ import type {
 import React from 'react';
 
 import { nakamaService } from '../services/nakama';
+import type { GameMode } from '../types/game';
+import { GAME_MODES } from '../types/game';
 
 import { useGameBoard, type PlayerMark, GameBoardProvider } from './GameBoardContext';
 
@@ -41,8 +43,8 @@ type ErrorPayload = {
 type MatchUpdateKind = 'start' | 'update' | 'complete';
 
 // Constants
-const MATCH_MODE_CLASSIC = 'classic';
-const MATCHMAKER_QUERY = '*'; // Server-authoritative query for Go plugin
+export const MATCH_MODE_CLASSIC = 'classic';
+export const MATCH_MODE_BLITZ = 'blitz';
 const MATCH_OPCODE_GAME_START = 1;
 const MATCH_OPCODE_BOARD_UPDATE = 2;
 const MATCH_OPCODE_GAME_OVER = 3;
@@ -76,15 +78,17 @@ interface MatchmakingContextValue {
   opponentName: string | null;
   opponentConnected: boolean;
   mode: string;
+  gameMode: GameMode; // Expose gameMode
   errorMessage: string | null;
   isMatchmakingRequested: boolean; // Track if user explicitly requested matchmaking
 
   // Actions
-  startMatchmaking: () => Promise<void>;
+  startMatchmaking: (gameMode?: GameMode) => Promise<void>;
   cleanupMatchmaking: () => Promise<void>;
   sendMove: (index: number) => void; // Delegate to GameBoardContext
   resetMatchState: () => void;
-  requestMatchmaking: () => void; // User explicitly requests matchmaking
+  requestMatchmaking: (gameMode?: GameMode) => void; // User explicitly requests matchmaking
+  setGameMode: (gameMode: GameMode) => void; // Set game mode
 
   // Match reference for direct access
   currentMatch: Match | null;
@@ -140,6 +144,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
   const [opponentName, setOpponentName] = React.useState<string | null>(null);
   const [opponentConnected, setOpponentConnected] = React.useState(false);
   const [mode, setMode] = React.useState(MATCH_MODE_CLASSIC);
+  const [gameMode, setGameMode] = React.useState<GameMode>(GAME_MODES.CLASSIC);
   const [isMatchmakingRequested, setIsMatchmakingRequested] = React.useState(false);
 
   // Refs
@@ -161,7 +166,10 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     gameBoard.resetBoard();
     setOpponentName(null);
     setOpponentConnected(false);
+    // Reset both mode and gameMode to default classic
+    console.log('🔄 Resetting game mode from', gameMode, 'to classic');
     setMode(MATCH_MODE_CLASSIC);
+    setGameMode(GAME_MODES.CLASSIC);
     setErrorMessage(null);
     setIsMatchmakingRequested(false); // Clear matchmaking intent.
     // It is critical to reset this flag here to ensure that after a full state reset,
@@ -174,13 +182,31 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     // Ensure matchmaking is marked as inactive
     isMatchmakingActiveRef.current = false;
     isJoiningMatchRef.current = false;
-  }, [gameBoard, setErrorMessage]);
+  }, [gameBoard, setErrorMessage, gameMode]);
 
   // Request matchmaking function - called when user explicitly wants to start matchmaking
-  const requestMatchmaking = React.useCallback(() => {
-    console.log('🎯 User explicitly requested matchmaking');
-    setIsMatchmakingRequested(true);
-  }, []);
+  const requestMatchmaking = React.useCallback(
+    (newGameMode?: GameMode) => {
+      const previousGameMode = gameMode;
+      console.log('🎯 User explicitly requested matchmaking:', {
+        requestedGameMode: newGameMode,
+        previousGameMode: previousGameMode,
+        willUpdateGameMode: !!newGameMode,
+      });
+
+      if (newGameMode) {
+        console.log(`🔄 Updating game mode: ${previousGameMode} → ${newGameMode}`);
+        setGameMode(newGameMode);
+        // Also update the mode state immediately so MatchStatusCard shows correct mode
+        setMode(newGameMode);
+        console.log(`🎮 Updated both gameMode and mode states to: ${newGameMode}`);
+      }
+
+      setIsMatchmakingRequested(true);
+      console.log('✅ Matchmaking request flag set to true');
+    },
+    [gameMode],
+  );
 
   // Send move function - delegates to game board context
   const sendMove = React.useCallback(
@@ -273,7 +299,25 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     (payload: ServerMatchState, kind: MatchUpdateKind) => {
       if (!isMountedRef.current) return;
 
-      console.log(`📦 Match ${kind}:`, payload);
+      console.log(`📦 Match ${kind} received:`, {
+        ...payload,
+        gameMode: payload.mode,
+        expectedMode: gameMode,
+      });
+
+      // Validate server game mode matches client expectation
+      if (payload.mode && payload.mode !== gameMode) {
+        console.warn('⚠️ Game mode mismatch detected:', {
+          serverMode: payload.mode,
+          clientMode: gameMode,
+          willUpdate: true,
+        });
+      } else if (payload.mode) {
+        console.log('✅ Game mode validation passed:', {
+          serverMode: payload.mode,
+          clientMode: gameMode,
+        });
+      }
 
       // Debug: Log players information
       if (payload.players) {
@@ -338,9 +382,24 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
         }
       }
 
-      // Update mode
+      // Update mode from server
       if (payload.mode) {
-        setMode(payload.mode);
+        if (
+          payload.mode &&
+          (payload.mode === GAME_MODES.CLASSIC || payload.mode === GAME_MODES.BLITZ)
+        ) {
+          console.log('🎮 Updating match mode from server:', {
+            previousMode: mode,
+            newMode: payload.mode,
+            source: 'server_match_state',
+          });
+          setMode(payload.mode);
+        } else {
+          console.warn('⚠️ Invalid game mode received from server:', {
+            receivedMode: payload.mode,
+            currentMode: mode,
+          });
+        }
       }
 
       // Handle winning condition
@@ -430,7 +489,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
         }
       }
     },
-    [gameBoard, opponentName],
+    [gameBoard, opponentName, gameMode, mode],
   );
 
   // Handle match data
@@ -475,9 +534,16 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
       processedTicketsRef.current.add(ticketId);
       isJoiningMatchRef.current = true;
 
-      console.log('🎯 Match found! Joining server-authoritative match...', matched.match_id);
+      console.log('🎯 Match found! Server created authoritative match:', {
+        matchId: matched.match_id,
+        ticket: ticketId,
+        currentGameMode: gameMode,
+        matchToken: matched.token,
+      });
       setPhase('joining');
-      setStatusMessage('Match found! Joining...');
+      setStatusMessage(
+        `${gameMode.charAt(0).toUpperCase() + gameMode.slice(1)} match found! Joining...`,
+      );
 
       try {
         // Store the session user ID for later reference
@@ -522,7 +588,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
         isJoiningMatchRef.current = false;
       }
     },
-    [setErrorMessage],
+    [setErrorMessage, gameMode],
   );
 
   // Attach socket handlers
@@ -607,68 +673,106 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
   );
 
   // Start matchmaking
-  const startMatchmaking = React.useCallback(async () => {
-    console.log('🚀 Starting matchmaking...');
-    console.log('🔍 Current state:', {
-      isMatchmakingActive: isMatchmakingActiveRef.current,
-      phase,
-      hasSocket: !!socketRef.current,
-      hasMatch: !!matchRef.current,
-      hasTicket: !!ticketRef.current,
-      isMatchmakingRequested,
-    });
+  const startMatchmaking = React.useCallback(
+    async (newGameMode?: GameMode) => {
+      console.log('🚀 Starting matchmaking process...');
 
-    // Only start matchmaking if user explicitly requested it
-    if (!isMatchmakingRequested) {
-      console.log('⚠️ Matchmaking not requested by user, skipping');
-      return;
-    }
+      // Update gameMode if provided, otherwise use current gameMode
+      if (newGameMode) {
+        console.log(`🔄 Updating game mode during start: ${gameMode} → ${newGameMode}`);
+        setGameMode(newGameMode);
+        // Also update the mode state immediately so MatchStatusCard shows correct mode
+        setMode(newGameMode);
+        console.log(`🎮 Updated both gameMode and mode states to: ${newGameMode}`);
+      }
 
-    if (isMatchmakingActiveRef.current) {
-      console.log('⚠️ Matchmaking already active, skipping');
-      return;
-    }
-
-    // Additional safety check - don't start if we're in a non-connecting phase
-    if (phase !== 'connecting' && phase !== 'error') {
-      console.log('⚠️ Matchmaking cannot start, current phase:', phase);
-      return;
-    }
-
-    console.log('✅ Starting fresh matchmaking session...');
-    isMatchmakingActiveRef.current = true;
-    isJoiningMatchRef.current = false;
-    processedTicketsRef.current.clear();
-
-    try {
-      setPhase('connecting');
-      setStatusMessage('Connecting to matchmaking...');
-      setErrorMessage(null);
-
-      const socket = await nakamaService.connectSocket();
-      socketRef.current = socket;
-      attachSocketHandlers(socket);
-
-      console.log('✅ Socket connected, requesting matchmaker ticket');
-      setPhase('matching');
-      setStatusMessage('Looking for opponents...');
-
-      const ticket = await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, {
-        mode: MATCH_MODE_CLASSIC,
+      const currentGameMode = newGameMode || gameMode;
+      console.log('🎮 Game mode resolved for matchmaking:', {
+        parameterGameMode: newGameMode,
+        stateGameMode: gameMode,
+        finalGameMode: currentGameMode,
       });
-      ticketRef.current = ticket;
 
-      console.log('🎫 Matchmaker ticket created:', ticket.ticket);
-      setStatusMessage('Searching for a match...');
-    } catch (error) {
-      console.error('❌ Matchmaking failed:', error);
-      setPhase('error');
-      setStatusMessage('Failed to start matchmaking');
-      setErrorMessage(
-        'Unable to connect to matchmaking. Please check your connection and try again.',
-      );
-    }
-  }, [attachSocketHandlers, phase, isMatchmakingRequested, setErrorMessage]);
+      console.log('🔍 Current matchmaking state:', {
+        isMatchmakingActive: isMatchmakingActiveRef.current,
+        phase,
+        hasSocket: !!socketRef.current,
+        hasMatch: !!matchRef.current,
+        hasTicket: !!ticketRef.current,
+        isMatchmakingRequested,
+      });
+
+      // Only start matchmaking if user explicitly requested it
+      if (!isMatchmakingRequested) {
+        console.log('⚠️ Matchmaking not requested by user, skipping');
+        return;
+      }
+
+      if (isMatchmakingActiveRef.current) {
+        console.log('⚠️ Matchmaking already active, skipping');
+        return;
+      }
+
+      // Additional safety check - don't start if we're in a non-connecting phase
+      if (phase !== 'connecting' && phase !== 'error') {
+        console.log('⚠️ Matchmaking cannot start, current phase:', phase);
+        return;
+      }
+
+      console.log('✅ Starting fresh matchmaking session...');
+      isMatchmakingActiveRef.current = true;
+      isJoiningMatchRef.current = false;
+      processedTicketsRef.current.clear();
+
+      try {
+        setPhase('connecting');
+        setStatusMessage('Connecting to matchmaking...');
+        setErrorMessage(null);
+
+        const socket = await nakamaService.connectSocket();
+        socketRef.current = socket;
+        attachSocketHandlers(socket);
+
+        console.log('✅ Socket connected, requesting matchmaker ticket');
+        setPhase('matching');
+        setStatusMessage('Looking for opponents...');
+
+        const matchmakerProperties = {
+          mode: currentGameMode,
+        };
+
+        // Query to find only players with the same game mode
+        // The '+' prefix makes it a MUST requirement for exact mode matching
+        const matchmakerQuery = `+properties.mode:${currentGameMode}`;
+
+        console.log('🎯 Creating matchmaker ticket with properties:', {
+          query: matchmakerQuery,
+          minPlayers: 2,
+          maxPlayers: 2,
+          properties: matchmakerProperties,
+          gameMode: currentGameMode,
+        });
+
+        const ticket = await socket.addMatchmaker(matchmakerQuery, 2, 2, matchmakerProperties);
+        ticketRef.current = ticket;
+
+        console.log('🎫 Matchmaker ticket created successfully:', {
+          ticketId: ticket.ticket,
+          gameMode: currentGameMode,
+          properties: matchmakerProperties,
+        });
+        setStatusMessage(`Searching for a ${currentGameMode} match...`);
+      } catch (error) {
+        console.error('❌ Matchmaking failed:', error);
+        setPhase('error');
+        setStatusMessage('Failed to start matchmaking');
+        setErrorMessage(
+          'Unable to connect to matchmaking. Please check your connection and try again.',
+        );
+      }
+    },
+    [attachSocketHandlers, phase, isMatchmakingRequested, setErrorMessage, gameMode],
+  );
 
   // Initialize component
   React.useEffect(() => {
@@ -705,6 +809,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     opponentName,
     opponentConnected,
     mode,
+    gameMode,
     errorMessage,
     isMatchmakingRequested,
 
@@ -714,6 +819,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     sendMove,
     resetMatchState,
     requestMatchmaking,
+    setGameMode,
 
     // Match reference
     currentMatch: matchRef.current,

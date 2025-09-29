@@ -13,6 +13,7 @@ import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
+import type { GameMode } from '../../../types/game';
 import { CustomButton } from '../../common/CustomButton';
 import { TextButton } from '../../common/TextButton';
 import { GameBoard, GameSymbol } from '../../game/GameBoard';
@@ -28,11 +29,23 @@ export const PlayerGameScreen: React.FC = () => {
     phase,
     opponentName,
     opponentConnected,
+    mode,
     sendMove,
     cleanupMatchmaking,
     resetMatchState,
     requestMatchmaking,
   } = useMatchmaking();
+
+  // Log game mode context
+  React.useEffect(() => {
+    console.log('🎮 PlayerGameScreen context:', {
+      phase,
+      mode,
+      opponentName,
+      opponentConnected,
+      playerName: displayName,
+    });
+  }, [phase, mode, opponentName, opponentConnected, displayName]);
 
   // Use game board context for game state
   const { board, winningCells, currentTurnMark, yourMark, resultLabel, resultTone, isSendingMove } =
@@ -56,13 +69,18 @@ export const PlayerGameScreen: React.FC = () => {
   }, [resetMatchState, navigation]);
 
   const handlePlayAgain = useCallback(() => {
-    console.log('🎮 Play again requested (cleanup handled automatically)');
+    console.log('🎮 Play again requested (cleanup handled automatically):', {
+      currentMode: mode,
+      phase,
+      willRequestSameMode: mode,
+    });
     // Reset match state and start new matchmaking
     resetMatchState();
-    // Request new matchmaking and navigate to loading screen
-    requestMatchmaking();
-    navigation.navigate('MatchLoading', { mode: 'player' });
-  }, [resetMatchState, requestMatchmaking, navigation]);
+    // Request new matchmaking with the same mode and navigate to loading screen
+    console.log(`🔄 Requesting new ${mode} matchmaking`);
+    requestMatchmaking(mode as GameMode);
+    navigation.navigate('MatchLoading', { mode: 'player', gameMode: mode as GameMode });
+  }, [resetMatchState, requestMatchmaking, navigation, mode, phase]);
 
   const handleLeaveGame = useCallback(async () => {
     console.log('🏠 Leaving game mid-play, manually cleaning up');
