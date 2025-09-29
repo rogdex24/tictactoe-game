@@ -2,11 +2,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Alert, StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthCheck } from '../../../hooks/useAuthCheck';
+import { useMatchmaking } from '../../../state/MatchmakingContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
@@ -14,67 +15,83 @@ import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
 import { LoadingSpinner } from '../../common/LoadingSpinner';
+import { MatchStatusCard } from '../../common/MatchStatusCard';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
 
-export const MatchLoadingScreen: React.FC = () => {
+type MatchLoadingScreenProps = NativeStackScreenProps<RootStackParamList, 'MatchLoading'>;
+
+const MatchLoadingContentPlayer: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
-  const { ensureAuthenticated, isAuthenticated } = useAuthCheck();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { ensureAuthenticated } = useAuthCheck();
+  const {
+    phase,
+    startMatchmaking,
+    cleanupMatchmaking,
+    currentMatch,
+    statusMessage,
+    opponentName,
+    opponentConnected,
+    mode,
+    resultLabel,
+    resultTone,
+    errorMessage,
+    isMatchmakingRequested,
+  } = useMatchmaking(); // Destructure specific properties
 
   const handleCancel = React.useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+    cleanupMatchmaking();
     navigation.navigate('Home');
+  }, [navigation, cleanupMatchmaking]);
+
+  const handleMatchSuccess = React.useCallback(() => {
+    // Navigate to PlayerGame when match is ready
+    navigation.navigate('PlayerGame');
   }, [navigation]);
 
-  const startGame = React.useCallback(async () => {
-    try {
-      // Ensure authentication before starting the game
-      await ensureAuthenticated();
-      navigation.navigate('Game');
-    } catch (error) {
-      console.error('Failed to authenticate before game start:', error);
-      Alert.alert(
-        'Authentication Required',
-        'Unable to connect to game servers. Please try again.',
-        [
-          {
-            text: 'Retry',
-            onPress: startGame,
-          },
-          {
-            text: 'Go Back',
-            style: 'cancel',
-            onPress: handleCancel,
-          },
-        ],
-      );
-    }
-  }, [ensureAuthenticated, navigation, handleCancel]);
-
   React.useEffect(() => {
-    // Check if already authenticated, if so start immediately
-    if (isAuthenticated) {
-      timeoutRef.current = setTimeout(() => {
-        navigation.navigate('Game');
-      }, 1500); // Shorter delay if already authenticated
-    } else {
-      // Try to authenticate and then start game
-      timeoutRef.current = setTimeout(() => {
-        startGame();
-      }, 2000);
-    }
+    const initializeMatchmaking = async () => {
+      console.log('🖼️ MatchLoadingScreen initializing matchmaking...');
+      console.log('🖼️ Current matchmaking phase:', phase);
+      console.log('🖼️ Matchmaking requested:', isMatchmakingRequested);
 
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+      // Only start matchmaking if user explicitly requested it
+      if (!isMatchmakingRequested) {
+        console.log('⚠️ MatchLoadingScreen: Matchmaking not requested by user, skipping');
+        return;
+      }
+
+      // Don't start matchmaking if we're already in an active state
+      if (phase === 'playing' || phase === 'joining' || phase === 'matching') {
+        console.log(
+          '⚠️ MatchLoadingScreen: Matchmaking already in progress, skipping initialization',
+        );
+        return;
+      }
+
+      try {
+        await ensureAuthenticated();
+        console.log('🚀 MatchLoadingScreen: Starting fresh matchmaking...');
+        await startMatchmaking();
+      } catch (error) {
+        console.error('Failed to initialize matchmaking:', error);
       }
     };
-  }, [navigation, isAuthenticated, startGame]);
+
+    // Only initialize if we're in a clean state and matchmaking was requested
+    if ((phase === 'connecting' || phase === 'error') && isMatchmakingRequested) {
+      initializeMatchmaking();
+    } else {
+      console.log('🖼️ MatchLoadingScreen: Skipping initialization, current phase:', phase);
+    }
+  }, [ensureAuthenticated, phase, startMatchmaking, isMatchmakingRequested]);
+
+  // Handle phase changes for player mode - navigate when match is ready
+  React.useEffect(() => {
+    if (phase === 'playing' && currentMatch) {
+      handleMatchSuccess();
+    }
+  }, [phase, currentMatch, handleMatchSuccess]);
 
   return (
     <LinearGradient
@@ -88,12 +105,20 @@ export const MatchLoadingScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.body}>
-            <Text
-              style={[typography.bodyPrimary, styles.greeting]}
-            >{`Hi, ${playerName || 'Player'}!`}</Text>
-            <LoadingSpinner />
-            <Text style={[typography.headingSecondary, styles.title]}>Finding a Player...</Text>
-            <Text style={[typography.bodyPrimary, styles.subtitle]}>Please wait a moment.</Text>
+            <Text style={[typography.bodyPrimary, styles.greeting]}>
+              {`Hi, ${playerName || 'Player'}!`}
+            </Text>
+            <MatchStatusCard
+              phase={phase}
+              statusMessage={statusMessage}
+              opponentName={opponentName}
+              opponentConnected={opponentConnected}
+              mode={mode}
+              resultLabel={resultLabel}
+              resultTone={resultTone}
+              errorMessage={errorMessage}
+              showSpinner={true}
+            />
           </View>
           <View style={styles.footer}>
             <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
@@ -102,6 +127,89 @@ export const MatchLoadingScreen: React.FC = () => {
       </SafeAreaView>
     </LinearGradient>
   );
+};
+
+const MatchLoadingContentBot: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { playerName } = usePlayer();
+  const { ensureAuthenticated, isAuthenticated } = useAuthCheck();
+
+  const handleCancel = React.useCallback(() => {
+    navigation.navigate('Home');
+  }, [navigation]);
+
+  const startBotGame = React.useCallback(async () => {
+    try {
+      // Ensure authentication before starting the game
+      await ensureAuthenticated();
+      navigation.navigate('Game');
+    } catch (error) {
+      console.error('Failed to authenticate before game start:', error);
+      Alert.alert(
+        'Authentication Required',
+        'Unable to connect to game servers. Please try again.',
+        [
+          {
+            text: 'Retry',
+            onPress: startBotGame,
+          },
+          {
+            text: 'Go Back',
+            style: 'cancel',
+            onPress: handleCancel,
+          },
+        ],
+      );
+    }
+  }, [ensureAuthenticated, navigation, handleCancel]);
+
+  React.useEffect(() => {
+    // For bot mode, no delay - just authenticate and start immediately
+    if (isAuthenticated) {
+      navigation.navigate('Game');
+    } else {
+      startBotGame();
+    }
+  }, [navigation, isAuthenticated, startBotGame]);
+
+  return (
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={styles.screen}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={colors.screenBackground} />
+      <BackgroundGlow />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <View style={styles.body}>
+            <Text style={[typography.bodyPrimary, styles.greeting]}>
+              {`Hi, ${playerName || 'Player'}!`}
+            </Text>
+            <LoadingSpinner />
+            <Text style={[typography.headingSecondary, styles.title]}>Preparing Bot Match...</Text>
+            <Text style={[typography.bodyPrimary, styles.subtitle]}>Setting up your game...</Text>
+          </View>
+          <View style={styles.footer}>
+            <CustomButton label="Cancel" onPress={handleCancel} variant="danger" />
+          </View>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+};
+
+export const MatchLoadingScreen: React.FC<MatchLoadingScreenProps> = ({ route }) => {
+  const { mode } = route.params;
+
+  // Use the appropriate content component based on mode
+  if (mode === 'player') {
+    return <MatchLoadingContentPlayer />;
+  }
+
+  // For bot mode, render directly without provider
+  return <MatchLoadingContentBot />;
 };
 
 const styles = StyleSheet.create({

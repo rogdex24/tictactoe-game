@@ -106,6 +106,29 @@ pnpm format     # Checks formatting across the repo
 pnpm typecheck  # Runs TypeScript and Go vet checks
 ```
 
+## Real-Time Gameplay Flow
+
+The multiplayer experience relies on Nakama's realtime socket API once a user has
+authenticated with the backend:
+
+1. **WebSocket connection** – The Expo client creates a socket and calls
+   `socket.connect(session, true)` so the player appears online and can enter the
+   matchmaking pool. See `nakamaService.connectSocket()` for the concrete
+   implementation.
+2. **Matchmaking updates** – While queued, the client listens for
+   `socket.onmatchmakermatched` to receive the authoritative `match_id` returned by
+   the Go plugin when it calls `nk.MatchCreate`.
+3. **Sending moves** – After joining a match, the client submits moves via
+   `socket.sendMatchState(matchId, opcode, payload)`; the player screen wraps this
+   to send the tapped cell index as JSON.
+4. **Receiving state** – Every broadcast from the server arrives through
+   `socket.onmatchdata`, where the UI inspects the opcode and updates the board,
+   turn indicator, and end-of-game messaging.
+
+The authoritative match handler in `backend/match.go` validates moves, tracks the
+board, and broadcasts the canonical state after each turn, ensuring all clients
+stay in sync.
+
 ### Frontend
 
 - `pnpm --filter frontend lint` – ESLint + Prettier

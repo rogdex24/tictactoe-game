@@ -1,16 +1,17 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Alert, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthCheck } from '../../../hooks/useAuthCheck';
+import { useMatchmaking } from '../../../state/MatchmakingContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
-import { layout, offsets, spacing } from '../../../styles/dimensions';
+import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
@@ -23,35 +24,55 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const { ensureAuthenticated, isAuthLoading } = useAuthCheck();
+  const { requestMatchmaking } = useMatchmaking();
   const trimmedName = playerName.trim();
   const hasPlayerName = trimmedName.length > 0;
+  const [selectedMode, setSelectedMode] = useState<'bot' | 'player'>('bot');
+  const isBotMode = selectedMode === 'bot';
 
   const handleStart = async () => {
-    // If no player name, go to player name screen first
     if (!hasPlayerName) {
-      navigation.navigate('PlayerName', { nextScreen: 'MatchLoading' });
+      if (isBotMode) {
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'bot' });
+      } else {
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'player' });
+      }
       return;
     }
 
-    // Ensure user is authenticated before starting game
-    try {
-      await ensureAuthenticated();
-      navigation.navigate('MatchLoading');
-    } catch (error) {
-      Alert.alert(
-        'Authentication Required',
-        'Unable to authenticate. Please check your connection and try again.',
-        [
-          {
-            text: 'Retry',
-            onPress: handleStart,
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ],
-      );
+    if (isBotMode) {
+      // OFFLINE mode - authentication is optional, just log failures
+      try {
+        await ensureAuthenticated();
+        console.log('✅ OFFLINE mode: Authentication successful');
+      } catch (error) {
+        console.log('⚠️ OFFLINE mode: Authentication failed, proceeding anyway:', error);
+        // Continue without authentication for offline play
+      }
+      navigation.navigate('MatchLoading', { mode: 'bot' });
+    } else {
+      // ONLINE mode - authentication is required
+      try {
+        await ensureAuthenticated();
+        // Request matchmaking before navigation
+        requestMatchmaking();
+        navigation.navigate('MatchLoading', { mode: 'player' });
+      } catch (error) {
+        Alert.alert(
+          'Online Play Authentication Required',
+          'Unable to authenticate for online play. Please check your connection and try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: handleStart,
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ],
+        );
+      }
     }
   };
 
@@ -98,6 +119,53 @@ export const HomeScreen: React.FC = () => {
             <GameIcons />
           </View>
           <View style={styles.ctaArea}>
+            <View style={styles.modeToggleContainer}>
+              <Text style={[typography.bodyPrimary, styles.modeToggleLabel]}>Choose a mode</Text>
+              <View style={styles.modeToggle}>
+                <Pressable
+                  accessibilityLabel="Play offline against the bot"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isBotMode }}
+                  onPress={() => setSelectedMode('bot')}
+                  style={({ pressed }) => [
+                    styles.modeOption,
+                    isBotMode && styles.modeOptionActive,
+                    pressed && styles.modeOptionPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.buttonPrimary,
+                      styles.modeOptionText,
+                      isBotMode && styles.modeOptionTextActive,
+                    ]}
+                  >
+                    OFFLINE
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Play online against other players"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isBotMode }}
+                  onPress={() => setSelectedMode('player')}
+                  style={({ pressed }) => [
+                    styles.modeOption,
+                    !isBotMode && styles.modeOptionActive,
+                    pressed && styles.modeOptionPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.buttonPrimary,
+                      styles.modeOptionText,
+                      !isBotMode && styles.modeOptionTextActive,
+                    ]}
+                  >
+                    ONLINE
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
             <CustomButton
               label={isAuthLoading ? 'Connecting...' : 'Start Game'}
               onPress={handleStart}
@@ -194,6 +262,48 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingTop: spacing.xl,
     zIndex: 1,
+  },
+  modeToggleContainer: {
+    marginBottom: spacing.lg,
+  },
+  modeToggleLabel: {
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceOverlay,
+    borderRadius: radius.pill,
+    padding: 4,
+    gap: 4,
+  },
+  modeOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    backgroundColor: 'transparent',
+  },
+  modeOptionPressed: {
+    backgroundColor: colors.borderTealSoft,
+  },
+  modeOptionActive: {
+    backgroundColor: colors.accentTealOverlay,
+    borderWidth: 1,
+    borderColor: colors.accentTealBorder,
+    shadowColor: colors.accentTeal,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modeOptionText: {
+    color: colors.textSecondary,
+  },
+  modeOptionTextActive: {
+    color: colors.textPrimary,
   },
   leaderboardButton: {
     marginTop: spacing.sm,

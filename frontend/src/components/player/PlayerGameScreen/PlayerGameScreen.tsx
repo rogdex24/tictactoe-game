@@ -3,9 +3,11 @@ import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useGameBoard } from '../../../state/GameBoardContext';
+import { useMatchmaking } from '../../../state/MatchmakingContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, spacing } from '../../../styles/dimensions';
@@ -13,150 +15,139 @@ import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
 import { CustomButton } from '../../common/CustomButton';
 import { TextButton } from '../../common/TextButton';
+import { GameBoard, GameSymbol } from '../../game/GameBoard';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
-import { GameBoard, GameSymbol } from '../GameBoard';
 
-type PlayerMark = 'X' | 'O';
-
-type GameState = 'PLAYING' | 'WON' | 'DRAW' | 'LOSE';
-
-const WINNING_COMBINATIONS: Array<[number, number, number]> = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
-const evaluateBoard = (
-  cells: (PlayerMark | null)[],
-): { winner: PlayerMark | null; line: [number, number, number] | null } => {
-  for (const combination of WINNING_COMBINATIONS) {
-    const [a, b, c] = combination;
-    const candidate = cells[a];
-    if (candidate && candidate === cells[b] && candidate === cells[c]) {
-      return { winner: candidate, line: combination };
-    }
-  }
-
-  return { winner: null, line: null };
-};
-
-const isBoardFull = (cells: (PlayerMark | null)[]) => cells.every((cell) => cell !== null);
-
-export const GameScreen: React.FC = () => {
+export const PlayerGameScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const displayName = playerName || 'Player';
-  const opponentName = 'CPU';
+
+  // Use matchmaking context for match state and actions
+  const {
+    phase,
+    opponentName,
+    opponentConnected,
+    sendMove,
+    cleanupMatchmaking,
+    resetMatchState,
+    requestMatchmaking,
+  } = useMatchmaking();
+
+  // Use game board context for game state
+  const { board, winningCells, currentTurnMark, yourMark, resultLabel, resultTone, isSendingMove } =
+    useGameBoard();
 
   const handleLeaderboard = useCallback(() => {
     navigation.navigate('Leaderboard');
   }, [navigation]);
 
-  const [board, setBoard] = useState<(PlayerMark | null)[]>(Array(9).fill(null));
-  const [currentPlayer, setCurrentPlayer] = useState<PlayerMark>('X');
-  const [gameState, setGameState] = useState<GameState>('PLAYING');
-  const [statusMessage, setStatusMessage] = useState<string>('Your Turn');
-  const [winner, setWinner] = useState<PlayerMark | null>(null);
-  const [winningCells, setWinningCells] = useState<number[] | null>(null);
-
-  const resetGame = useCallback(() => {
-    setBoard(Array(9).fill(null));
-    setCurrentPlayer('X');
-    setGameState('PLAYING');
-    setWinner(null);
-    setWinningCells(null);
-    setStatusMessage('Your Turn');
-  }, []);
-
-  const handlePlayAgain = useCallback(() => {
-    resetGame();
-  }, [resetGame]);
-
-  const handleGoHome = useCallback(() => {
-    resetGame();
-    navigation.navigate('Home');
-  }, [navigation, resetGame]);
-
-  const handleLeaveGame = useCallback(() => {
-    resetGame();
-    navigation.navigate('Home');
-  }, [navigation, resetGame]);
-
-  useEffect(() => {
-    resetGame();
-  }, [resetGame]);
-
-  useEffect(() => {
-    if (gameState === 'PLAYING') {
-      setStatusMessage(currentPlayer === 'X' ? 'Your Turn' : 'Opponent Turn');
-    }
-  }, [currentPlayer, gameState]);
-
   const handleCellPress = useCallback(
     (index: number) => {
-      if (gameState !== 'PLAYING' || board[index]) {
-        return;
-      }
-
-      const nextBoard = [...board];
-      nextBoard[index] = currentPlayer;
-      setBoard(nextBoard);
-
-      const { winner: roundWinner, line } = evaluateBoard(nextBoard);
-
-      if (roundWinner) {
-        setGameState(roundWinner === 'X' ? 'WON' : 'LOSE');
-        setWinner(roundWinner);
-        setWinningCells(line);
-        const winnerName = roundWinner === 'X' ? displayName : opponentName;
-        setStatusMessage(`${winnerName} (${roundWinner}) Wins!`);
-        return;
-      }
-
-      if (isBoardFull(nextBoard)) {
-        setGameState('DRAW');
-        setWinningCells(null);
-        setStatusMessage("It's a Draw!");
-        return;
-      }
-
-      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+      sendMove(index);
     },
-    [board, currentPlayer, gameState, displayName, opponentName],
+    [sendMove],
   );
 
-  const boardDisabled = gameState !== 'PLAYING';
+  const handleGoHome = useCallback(async () => {
+    console.log('🏠 Going home without playing again');
+    await cleanupMatchmaking();
+    resetMatchState();
+    navigation.navigate('Home');
+  }, [cleanupMatchmaking, resetMatchState, navigation]);
 
-  const activeSymbol = useMemo<PlayerMark>(() => {
-    if ((gameState === 'WON' || gameState === 'LOSE') && winner) {
-      return winner;
+  const handlePlayAgain = useCallback(async () => {
+    console.log('🎮 Play again requested - cleaning up and starting new matchmaking');
+    // Clean up current match and reset all state
+    await cleanupMatchmaking();
+    resetMatchState();
+    // Request new matchmaking and navigate to loading screen
+    requestMatchmaking();
+    navigation.navigate('MatchLoading', { mode: 'player' });
+  }, [cleanupMatchmaking, resetMatchState, requestMatchmaking, navigation]);
+
+  const handleLeaveGame = useCallback(async () => {
+    console.log('🏠 Navigating back to home, stopping matchmaking and resetting state');
+    await cleanupMatchmaking();
+    resetMatchState();
+    navigation.navigate('Home');
+  }, [cleanupMatchmaking, resetMatchState, navigation]);
+
+  // Auto-reset match state when game completes (but keep it visible until user navigates away)
+  useEffect(() => {
+    if (phase === 'complete') {
+      console.log('🏁 Game completed, will reset state on next navigation');
+      // Don't reset immediately - let user see the result
+      // State will be reset when they click "Play Again" or "Leave Game"
+    }
+  }, [phase]);
+
+  const boardDisabled =
+    phase !== 'playing' ||
+    !yourMark ||
+    currentTurnMark !== yourMark ||
+    isSendingMove ||
+    !opponentConnected;
+
+  // Determine the current turn's status message
+  const statusMessage = useMemo(() => {
+    if (phase === 'complete') {
+      // Use the server-provided result label if available
+      if (resultLabel) {
+        return resultLabel;
+      }
+      return 'Game Complete';
     }
 
-    return currentPlayer;
-  }, [currentPlayer, gameState, winner]);
+    if (phase !== 'playing') {
+      return 'Waiting...';
+    }
 
+    if (!opponentConnected) {
+      return 'Opponent Disconnected';
+    }
+
+    if (currentTurnMark === yourMark) {
+      return 'Your Turn';
+    } else {
+      return 'Opponent Turn';
+    }
+  }, [phase, currentTurnMark, yourMark, opponentConnected, resultLabel]);
+
+  // Determine active symbol for turn indicator
+  const activeSymbol = useMemo(() => {
+    if (phase === 'complete' && winningCells) {
+      // Show the winning symbol
+      const winningCell = winningCells[0];
+      return board[winningCell] as 'X' | 'O';
+    }
+
+    return currentTurnMark || 'X';
+  }, [currentTurnMark, phase, winningCells, board]);
+
+  // Determine status color based on game state
   const statusColor = useMemo(() => {
-    if (gameState === 'WON') {
-      return winner === 'X' ? colors.accentMint : colors.accentTealSoft;
+    if (phase === 'complete') {
+      // Use server-provided result tone for color
+      if (resultTone === 'win') {
+        return yourMark === 'X' ? colors.accentMint : colors.accentTealSoft;
+      } else if (resultTone === 'loss') {
+        return colors.accentDanger;
+      } else if (resultTone === 'draw') {
+        return colors.accentDraw;
+      } else if (resultTone === 'forfeit') {
+        return colors.textSecondary;
+      }
     }
 
-    if (gameState === 'LOSE') {
+    if (!opponentConnected) {
       return colors.accentDanger;
     }
 
-    if (gameState === 'DRAW') {
-      return colors.accentDraw;
-    }
+    return currentTurnMark === 'X' ? colors.accentMint : colors.textTealHighlight;
+  }, [currentTurnMark, phase, yourMark, opponentConnected, resultTone]);
 
-    return currentPlayer === 'X' ? colors.accentMint : colors.textTealHighlight;
-  }, [currentPlayer, gameState, winner]);
-
-  const isGameComplete = gameState === 'WON' || gameState === 'LOSE' || gameState === 'DRAW';
+  const isGameComplete = phase === 'complete';
 
   return (
     <LinearGradient
@@ -174,7 +165,9 @@ export const GameScreen: React.FC = () => {
               <Text style={[styles.matchupText, styles.matchupName]}>{displayName}</Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (YOU)</Text>
               <Text style={[styles.matchupText, styles.matchupSeparator]}> vs. </Text>
-              <Text style={[styles.matchupText, styles.matchupOpponent]}>{opponentName}</Text>
+              <Text style={[styles.matchupText, styles.matchupOpponent]}>
+                {opponentName || 'Opponent'}
+              </Text>
               <Text style={[styles.matchupText, styles.matchupAffiliation]}> (OPP)</Text>
             </View>
           </View>
@@ -263,14 +256,6 @@ const styles = StyleSheet.create({
   },
   matchupOpponent: {
     color: colors.textPrimary,
-  },
-  scoreText: {
-    fontFamily: typography.fontFamilyExtraBold,
-    fontSize: 48,
-    lineHeight: 52,
-    letterSpacing: 6,
-    color: colors.textPrimary,
-    marginTop: spacing.sm,
   },
   body: {
     flex: 1,
