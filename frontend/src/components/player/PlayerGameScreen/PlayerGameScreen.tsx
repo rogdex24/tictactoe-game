@@ -49,25 +49,23 @@ export const PlayerGameScreen: React.FC = () => {
     [sendMove],
   );
 
-  const handleGoHome = useCallback(async () => {
-    console.log('🏠 Going home without playing again');
-    await cleanupMatchmaking();
+  const handleGoHome = useCallback(() => {
+    console.log('🏠 Going home (cleanup handled automatically)');
     resetMatchState();
     navigation.navigate('Home');
-  }, [cleanupMatchmaking, resetMatchState, navigation]);
+  }, [resetMatchState, navigation]);
 
-  const handlePlayAgain = useCallback(async () => {
-    console.log('🎮 Play again requested - cleaning up and starting new matchmaking');
-    // Clean up current match and reset all state
-    await cleanupMatchmaking();
+  const handlePlayAgain = useCallback(() => {
+    console.log('🎮 Play again requested (cleanup handled automatically)');
+    // Reset match state and start new matchmaking
     resetMatchState();
     // Request new matchmaking and navigate to loading screen
     requestMatchmaking();
     navigation.navigate('MatchLoading', { mode: 'player' });
-  }, [cleanupMatchmaking, resetMatchState, requestMatchmaking, navigation]);
+  }, [resetMatchState, requestMatchmaking, navigation]);
 
   const handleLeaveGame = useCallback(async () => {
-    console.log('🏠 Navigating back to home, stopping matchmaking and resetting state');
+    console.log('🏠 Leaving game mid-play, manually cleaning up');
     await cleanupMatchmaking();
     resetMatchState();
     navigation.navigate('Home');

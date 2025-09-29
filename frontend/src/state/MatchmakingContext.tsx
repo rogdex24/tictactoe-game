@@ -683,6 +683,21 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     };
   }, [cleanupMatchmaking]);
 
+  // Auto-cleanup when game completes
+  React.useEffect(() => {
+    if (phase === 'complete') {
+      console.log('🏁 Game completed, automatically cleaning up matchmaking');
+      // Add a small delay to ensure the user can see the result briefly
+      const timer = setTimeout(() => {
+        cleanupMatchmaking().catch((error) => {
+          console.warn('Failed to auto-cleanup matchmaking on game completion:', error);
+        });
+      }, 1000); // 1 second delay to show the result
+
+      return () => clearTimeout(timer);
+    }
+  }, [phase, cleanupMatchmaking]);
+
   const contextValue: MatchmakingContextValue = {
     // State
     phase,
