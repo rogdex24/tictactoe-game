@@ -5,6 +5,7 @@ import React from 'react';
 import { colors } from '../../../styles/colors';
 import { radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
+import { getDisplayName, isValidGameMode } from '../../../types/game';
 
 type MatchPhase = 'connecting' | 'matching' | 'joining' | 'playing' | 'complete' | 'error';
 type ResultTone = 'win' | 'loss' | 'draw' | 'forfeit';
@@ -47,8 +48,11 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
   errorMessage,
   showSpinner = true,
 }) => {
+
   const isLoadingPhase = phase === 'connecting' || phase === 'matching' || phase === 'joining';
   const resultColor = toneToColor(resultTone ?? null);
+
+  const displayMode = isValidGameMode(mode) ? getDisplayName(mode) : mode || 'Classic';
 
   return (
     <View style={styles.statusCard}>
@@ -72,9 +76,7 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
         </View>
         <View style={styles.metaItem}>
           <Text style={[typography.bodyPrimary, styles.metaLabel]}>Mode</Text>
-          <Text style={[typography.bodyPrimary, styles.metaValueText]}>
-            {mode === 'classic' ? 'Classic' : mode}
-          </Text>
+          <Text style={[typography.bodyPrimary, styles.metaValueText]}>{displayMode}</Text>
         </View>
       </View>
 

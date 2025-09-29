@@ -20,7 +20,11 @@ import { BackgroundGlow } from '../../home/BackgroundGlow';
 
 type MatchLoadingScreenProps = NativeStackScreenProps<RootStackParamList, 'MatchLoading'>;
 
-const MatchLoadingContentPlayer: React.FC = () => {
+interface MatchLoadingContentPlayerProps {
+  // No need for gameMode prop since we get it from context
+}
+
+const MatchLoadingContentPlayer: React.FC<MatchLoadingContentPlayerProps> = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const { ensureAuthenticated } = useAuthCheck();
@@ -73,6 +77,7 @@ const MatchLoadingContentPlayer: React.FC = () => {
       try {
         await ensureAuthenticated();
         console.log('🚀 MatchLoadingScreen: Starting fresh matchmaking...');
+        // Use current gameMode from context, don't override it
         await startMatchmaking();
       } catch (error) {
         console.error('Failed to initialize matchmaking:', error);
@@ -200,7 +205,7 @@ const MatchLoadingContentBot: React.FC = () => {
 };
 
 export const MatchLoadingScreen: React.FC<MatchLoadingScreenProps> = ({ route }) => {
-  const { mode } = route.params;
+  const { mode } = route.params; // Only need mode from route params now
 
   // Use the appropriate content component based on mode
   if (mode === 'player') {

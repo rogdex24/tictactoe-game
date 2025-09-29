@@ -19,12 +19,13 @@ import { IconButton } from '../../common/IconButton';
 import { TextButton } from '../../common/TextButton';
 import { BackgroundGlow } from '../BackgroundGlow';
 import { GameIcons } from '../GameIcons';
+import { GameModeSelector } from '../GameModeSelector';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const { ensureAuthenticated, isAuthLoading } = useAuthCheck();
-  const { requestMatchmaking } = useMatchmaking();
+  const { requestMatchmaking, gameMode, setGameMode } = useMatchmaking();
   const trimmedName = playerName.trim();
   const hasPlayerName = trimmedName.length > 0;
   const [selectedMode, setSelectedMode] = useState<'bot' | 'player'>('bot');
@@ -33,9 +34,9 @@ export const HomeScreen: React.FC = () => {
   const handleStart = async () => {
     if (!hasPlayerName) {
       if (isBotMode) {
-        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'bot' });
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'bot', gameMode });
       } else {
-        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'player' });
+        navigation.navigate('PlayerName', { nextScreen: 'MatchLoading', mode: 'player', gameMode });
       }
       return;
     }
@@ -49,14 +50,14 @@ export const HomeScreen: React.FC = () => {
         console.log('⚠️ OFFLINE mode: Authentication failed, proceeding anyway:', error);
         // Continue without authentication for offline play
       }
-      navigation.navigate('MatchLoading', { mode: 'bot' });
+      navigation.navigate('MatchLoading', { mode: 'bot', gameMode });
     } else {
       // ONLINE mode - authentication is required
       try {
         await ensureAuthenticated();
         // Request matchmaking before navigation
-        requestMatchmaking();
-        navigation.navigate('MatchLoading', { mode: 'player' });
+        requestMatchmaking(gameMode);
+        navigation.navigate('MatchLoading', { mode: 'player', gameMode });
       } catch (error) {
         Alert.alert(
           'Online Play Authentication Required',
@@ -119,6 +120,11 @@ export const HomeScreen: React.FC = () => {
             <GameIcons />
           </View>
           <View style={styles.ctaArea}>
+            <GameModeSelector
+              selectedGameMode={gameMode}
+              onGameModeChange={setGameMode}
+              visible={!isBotMode}
+            />
             <View style={styles.modeToggleContainer}>
               <Text style={[typography.bodyPrimary, styles.modeToggleLabel]}>Choose a mode</Text>
               <View style={styles.modeToggle}>

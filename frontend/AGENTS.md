@@ -40,11 +40,12 @@ graph TD
 
 \*\*HomeScreen.tsx (`frontend/src/components/home/HomeScreen/HomeScreen.tsx`)
 
-- Purpose: Landing lobby to choose bot or multiplayer, surface greeting, and link to leaderboard.
+- Purpose: Landing lobby to choose bot or multiplayer with game mode selection (Classic/Blitz), surface greeting, and link to leaderboard.
 - Routes: Starts PlayerName when no name or editing, otherwise pushes MatchLoading with the selected mode, and opens Leaderboard via CTA (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:31`, `:64`).
-- Components: `BackgroundGlow`, `GameIcons`, `CustomButton`, `IconButton`, `TextButton` (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:16-20`).
-- Shared state/services: Reads `playerName` from `usePlayer` and `ensureAuthenticated`/`isAuthLoading` from `useAuthCheck` before navigation (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:24-43`).
-- Caveats: Always await `ensureAuthenticated` so MatchLoading receives a valid session; keep the trimmed-name guard to avoid empty identifiers when users enter only whitespace.
+- Components: `BackgroundGlow`, `GameIcons`, `GameModeSelector`, `CustomButton`, `IconButton`, `TextButton` (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:16-20`).
+- Game Mode Selection: Uses centralized `GameMode` type and `MatchmakingContext` for state management. `GameModeSelector` component provides Classic/Blitz toggle with consistent styling.
+- Shared state/services: Reads `playerName` from `usePlayer`, game mode from `useMatchmaking`, and `ensureAuthenticated`/`isAuthLoading` from `useAuthCheck` before navigation (`frontend/src/components/home/HomeScreen/HomeScreen.tsx:24-43`).
+- Caveats: Always await `ensureAuthenticated` so MatchLoading receives a valid session; keep the trimmed-name guard to avoid empty identifiers when users enter only whitespace; game mode state persists across navigation.
 
 \*\*PlayerNameScreen.tsx (`frontend/src/components/onboarding/PlayerNameScreen/PlayerNameScreen.tsx`)
 
@@ -398,9 +399,17 @@ func beforeAuthenticateDevice(ctx context.Context, logger runtime.Logger, db *sq
 }
 ```
 
-## Recent Changes (feat/global_leaderboard Branch)
+## Recent Changes (feat/multiple_game_modes Branch)
 
 ### Major Features Added
+
+#### 🎯 Game Mode Centralization & Type Safety
+
+- **Centralized Types**: Created unified `GameMode` type system in `src/types/game.ts`
+- **Constants & Utilities**: Added `GAME_MODES` constants and utility functions (`isValidGameMode`, `getDisplayName`)
+- **Type Safety**: Replaced 13+ inline type definitions with centralized `GameMode` type
+- **Maintainability**: Single source of truth for game mode definitions and display logic
+- **Developer Experience**: TypeScript ensures complete coverage when adding new game modes
 
 #### ✨ Global Leaderboard System
 
@@ -425,6 +434,15 @@ func beforeAuthenticateDevice(ctx context.Context, logger runtime.Logger, db *sq
 
 ### Files Modified
 
+#### Type System & Game Mode Architecture
+
+- **src/types/game.ts**: New centralized game mode type definitions, constants, and utility functions
+- **src/types/components.ts**: Updated navigation types to use centralized `GameMode` type
+- **MatchmakingContext.tsx**: Replaced 7 inline type definitions with centralized types and constants
+- **GameModeSelector.tsx**: Updated component props and replaced string literals with constants
+- **PlayerGameScreen.tsx**: Updated type casting to use centralized `GameMode` type
+- **PlayerNameScreen.tsx**: Updated default values to use game mode constants
+
 #### Frontend Core
 
 - **LeaderboardScreen.tsx**: Complete rewrite with live data integration and user highlighting
@@ -442,7 +460,16 @@ func beforeAuthenticateDevice(ctx context.Context, logger runtime.Logger, db *sq
 
 ### Testing & Validation
 
-- **Integration Tests**: Verified frontend-backend compatibility
+#### Type System Validation
+
+- **TypeScript Compilation**: All game mode type changes compile successfully with no errors
+- **ESLint Validation**: Code passes linting with proper import ordering and type usage
+- **Type Coverage**: Verified all 13+ inline type definitions were successfully replaced
+- **Constant Usage**: Confirmed all string literals replaced with centralized constants
+
+#### Integration Tests
+
+- **Frontend-backend compatibility**: Verified frontend-backend compatibility
 - **Score Formula Tests**: Validated all scoring scenarios including edge cases
 - **State Management Tests**: Confirmed proper cleanup and reset behaviors
 - **UI Flow Tests**: Validated complete user journey from home to leaderboard
@@ -471,13 +498,101 @@ func beforeAuthenticateDevice(ctx context.Context, logger runtime.Logger, db *sq
 - **Icons & Illustration:** SVG-based icons live in `src/components/home/GameIcons`. Reuse and compose SVG primitives instead of embedding raw XML strings. The X/O hero art should remain centered within a `192px` stage to preserve alignment with the provided reference.
 - **Gradients:** Prefer `expo-linear-gradient` for decorative gradients. Keep start/end coordinates explicit so future tweaks remain predictable.
 
+## Type System & Game Mode Architecture
+
+### Centralized Game Mode Types
+
+The app uses a centralized type system for game modes to ensure maintainability and type safety across all components.
+
+#### Core Types (`src/types/game.ts`)
+
+```typescript
+export type GameMode = 'classic' | 'blitz';
+
+export const GAME_MODES = {
+  CLASSIC: 'classic' as const,
+  BLITZ: 'blitz' as const,
+} as const;
+
+export const GAME_MODE_VALUES: GameMode[] = [GAME_MODES.CLASSIC, GAME_MODES.BLITZ];
+```
+
+#### Utility Functions
+
+- **`isValidGameMode(mode: string): mode is GameMode`**: Type guard for validating game mode strings
+- **`getDisplayName(mode: GameMode): string`**: Converts game mode to user-friendly display text
+  - `'classic'` → `'Classic'`
+  - `'blitz'` → `'Blitz'`
+
+#### Usage Patterns
+
+**✅ Do**: Use centralized types and constants
+
+```typescript
+import { GameMode, GAME_MODES, getDisplayName } from '../types/game';
+
+// Component props
+interface Props {
+  gameMode: GameMode;
+  onModeChange: (mode: GameMode) => void;
+}
+
+// State initialization
+const [mode, setMode] = useState<GameMode>(GAME_MODES.CLASSIC);
+
+// Event handlers
+onPress={() => onModeChange(GAME_MODES.BLITZ)}
+
+// Display formatting
+const displayText = getDisplayName(gameMode);
+```
+
+**❌ Don't**: Use inline type definitions or hardcoded strings
+
+```typescript
+// Avoid these patterns
+selectedGameMode: 'classic' | 'blitz'  // Use GameMode instead
+onPress={() => setMode('classic')}     // Use GAME_MODES.CLASSIC
+mode === 'classic' ? 'Classic' : 'Blitz'  // Use getDisplayName()
+```
+
+#### Integration Points
+
+The centralized game mode system integrates across:
+
+- **Navigation Types**: `RootStackParamList` uses `GameMode` for route parameters
+- **Component Props**: All game mode selectors and displays use `GameMode` type
+- **State Management**: `MatchmakingContext` uses `GameMode` for type safety
+- **Backend Integration**: Server queries use game mode constants for consistency
+
+#### Adding New Game Modes
+
+To add a new game mode (e.g., 'speed'):
+
+1. **Update core type**: Add to `GameMode` union type
+2. **Add constant**: Include in `GAME_MODES` object
+3. **Update utilities**: Add case in `getDisplayName()` function
+4. **Backend sync**: Ensure server recognizes the new mode
+
+All existing components will automatically get TypeScript errors for incomplete switch statements, ensuring complete coverage.
+
+#### Migration Notes
+
+This centralized system replaces 13+ instances of inline `'classic' | 'blitz'` type definitions that were scattered across:
+
+- MatchmakingContext (7 instances)
+- Navigation types (2 instances)
+- Component props (4 instances)
+
+The refactoring improves maintainability and ensures consistent game mode handling throughout the application.
+
 ## Component Patterns
 
 - Organize UI into small, focused components. Shared primitives belong under `src/components/common` while feature-specific pieces sit within their feature folder.
 - Export each component through an `index.ts` barrel to maintain clean import paths.
 - Favor functional components with React hooks. Avoid class components unless absolutely necessary.
 - Keep layout logic close to the view. State and side-effects should move upward toward screen-level containers.
-- Navigation types should extend the central `RootStackParamList` (`src/types/components.ts`).
+- Navigation types should extend the central `RootStackParamList` (`src/types/components.ts`) and use centralized game types from `src/types/game.ts`.
 
 ## Styling Practices
 

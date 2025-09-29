@@ -11,6 +11,7 @@ import { colors } from '../../../styles/colors';
 import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
 import type { RootStackParamList } from '../../../types/components';
+import { GAME_MODES } from '../../../types/game';
 import { BackButton } from '../../common/BackButton';
 import { CustomButton } from '../../common/CustomButton';
 import { BackgroundGlow } from '../../home/BackgroundGlow';
@@ -29,6 +30,7 @@ export const PlayerNameScreen: React.FC = () => {
   const [name, setName] = React.useState(playerName);
   const nextScreen = route.params?.nextScreen ?? 'MatchLoading';
   const mode = route.params?.mode;
+  const gameMode = route.params?.gameMode ?? GAME_MODES.CLASSIC;
 
   React.useEffect(() => {
     setName(playerName);
@@ -57,27 +59,27 @@ export const PlayerNameScreen: React.FC = () => {
 
       // Navigate to the appropriate screen with proper parameters
       if (nextScreen === 'MatchLoading' && mode) {
-        navigation.navigate('MatchLoading', { mode });
+        navigation.navigate('MatchLoading', { mode, gameMode });
       } else if (nextScreen === 'Home') {
         navigation.navigate('Home');
       } else if (nextScreen === 'PlayerGame') {
         navigation.navigate('PlayerGame');
       } else {
         // Default to MatchLoading with 'player' mode if no mode specified
-        navigation.navigate('MatchLoading', { mode: 'player' });
+        navigation.navigate('MatchLoading', { mode: 'player', gameMode });
       }
     } catch (error) {
       console.error('Failed to update name or authenticate:', error);
       // Still navigate but user might not be authenticated - will be handled in game flow
       if (nextScreen === 'MatchLoading' && mode) {
-        navigation.navigate('MatchLoading', { mode });
+        navigation.navigate('MatchLoading', { mode, gameMode });
       } else if (nextScreen === 'Home') {
         navigation.navigate('Home');
       } else if (nextScreen === 'PlayerGame') {
         navigation.navigate('PlayerGame');
       } else {
         // Default to MatchLoading with 'player' mode if no mode specified
-        navigation.navigate('MatchLoading', { mode: 'player' });
+        navigation.navigate('MatchLoading', { mode: 'player', gameMode });
       }
     }
   };
