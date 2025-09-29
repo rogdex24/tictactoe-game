@@ -37,15 +37,6 @@ export const PlayerGameScreen: React.FC = () => {
   } = useMatchmaking();
 
   // Log game mode context
-  React.useEffect(() => {
-    console.log('🎮 PlayerGameScreen context:', {
-      phase,
-      mode,
-      opponentName,
-      opponentConnected,
-      playerName: displayName,
-    });
-  }, [phase, mode, opponentName, opponentConnected, displayName]);
 
   // Use game board context for game state
   const { board, winningCells, currentTurnMark, yourMark, resultLabel, resultTone, isSendingMove } =
