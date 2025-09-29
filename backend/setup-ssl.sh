@@ -36,7 +36,7 @@ start_services_initial() {
     sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/fullchain.pem|/etc/nginx/ssl/fullchain.pem|g' nginx.conf
     sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/privkey.pem|/etc/nginx/ssl/privkey.pem|g' nginx.conf
     
-    sudo docker compose up -d postgres nakama nginx
+    docker compose up -d postgres nakama nginx
     sleep 10
     echo "✅ Services started with self-signed certificate"
 }
@@ -48,21 +48,36 @@ obtain_letsencrypt_cert() {
     # First, test if the domain is accessible for ACME challenge
     echo "🧪 Testing domain accessibility..."
     
-    # Create a test file for ACME challenge verification
-    docker compose exec nginx mkdir -p /var/www/certbot/.well-known/acme-challenge
-    docker compose exec nginx sh -c 'echo "test-challenge-file" > /var/www/certbot/.well-known/acme-challenge/test'
+    # Ensure the certbot webroot directory exists on the host
+    # The directory should be created by docker-compose volumes, but let's make sure
+    docker compose run --rm --entrypoint="" certbot sh -c "mkdir -p /var/www/certbot/.well-known/acme-challenge"
+    
+    # Create a test file for ACME challenge verification using certbot container
+    docker compose run --rm --entrypoint="" certbot sh -c 'echo "test-challenge-file" > /var/www/certbot/.well-known/acme-challenge/test'
     
     # Test if we can access the challenge file
     sleep 5
     if curl -f "http://$DOMAIN/.well-known/acme-challenge/test" >/dev/null 2>&1; then
         echo "✅ Domain is accessible for ACME challenges"
-        docker compose exec nginx rm -f /var/www/certbot/.well-known/acme-challenge/test
+        # Cleanup test file
+        docker compose run --rm --entrypoint="" certbot rm -f /var/www/certbot/.well-known/acme-challenge/test
     else
         echo "❌ Domain is not accessible for ACME challenges"
         echo "   Please ensure:"
         echo "   1. $DOMAIN points to this server's public IP"
         echo "   2. Port 80 is open and accessible from the internet"
         echo "   3. No firewall is blocking HTTP traffic"
+        echo "   4. DNS has propagated (check: nslookup $DOMAIN)"
+        
+        # Show current status for debugging
+        echo "   Debugging info:"
+        echo "   - Testing local nginx response..."
+        LOCAL_TEST=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/.well-known/acme-challenge/test" 2>/dev/null || echo "failed")
+        echo "   - Local test result: $LOCAL_TEST"
+        
+        # Cleanup test file
+        docker compose run --rm --entrypoint="" certbot rm -f /var/www/certbot/.well-known/acme-challenge/test 2>/dev/null || true
+        
         read -p "Continue anyway? (y/n): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -71,7 +86,8 @@ obtain_letsencrypt_cert() {
         fi
     fi
     
-    # Run certbot to get the certificate (without sudo)
+    # Run certbot to get the certificate
+    echo "🔒 Running certbot certificate request..."
     docker compose run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
@@ -83,7 +99,7 @@ obtain_letsencrypt_cert() {
         -d "$DOMAIN"
     
     # Check if certificate was created
-    if docker compose exec nginx test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then
+    if docker compose run --rm --entrypoint="" certbot test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then
         echo "✅ Let's Encrypt certificate obtained successfully"
     else
         echo "❌ Certificate creation failed"
@@ -92,6 +108,7 @@ obtain_letsencrypt_cert() {
         echo "   2. Verify domain DNS: nslookup $DOMAIN"
         echo "   3. Test HTTP access: curl -I http://$DOMAIN/.well-known/acme-challenge/"
         echo "   4. Check firewall settings"
+        echo "   5. Try manual test: docker compose run --rm certbot certonly --manual -d $DOMAIN"
         return 1
     fi
 }
@@ -118,8 +135,8 @@ setup_renewal() {
     cat > renew-certs.sh << 'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
-sudo docker compose run --rm certbot renew --webroot --webroot-path=/var/www/certbot
-sudo docker compose exec nginx nginx -s reload
+docker compose run --rm certbot renew --webroot --webroot-path=/var/www/certbot
+docker compose exec nginx nginx -s reload
 echo "Certificate renewal completed at $(date)"
 EOF
     
