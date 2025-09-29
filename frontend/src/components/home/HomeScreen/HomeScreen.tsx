@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthCheck } from '../../../hooks/useAuthCheck';
+import { useMatchmaking } from '../../../state/MatchmakingContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, offsets, radius, spacing } from '../../../styles/dimensions';
@@ -23,6 +24,7 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const { ensureAuthenticated, isAuthLoading } = useAuthCheck();
+  const { requestMatchmaking } = useMatchmaking();
   const trimmedName = playerName.trim();
   const hasPlayerName = trimmedName.length > 0;
   const [selectedMode, setSelectedMode] = useState<'bot' | 'player'>('bot');
@@ -38,26 +40,39 @@ export const HomeScreen: React.FC = () => {
       return;
     }
 
-    try {
-      await ensureAuthenticated();
-      navigation.navigate('MatchLoading', { mode: isBotMode ? 'bot' : 'player' });
-    } catch (error) {
-      Alert.alert(
-        isBotMode ? 'Authentication Required' : 'Multiplayer Sign-in Needed',
-        isBotMode
-          ? 'Unable to authenticate. Please check your connection and try again.'
-          : 'Unable to prepare your multiplayer session. Please check your connection and try again.',
-        [
-          {
-            text: 'Retry',
-            onPress: handleStart,
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ],
-      );
+    if (isBotMode) {
+      // OFFLINE mode - authentication is optional, just log failures
+      try {
+        await ensureAuthenticated();
+        console.log('✅ OFFLINE mode: Authentication successful');
+      } catch (error) {
+        console.log('⚠️ OFFLINE mode: Authentication failed, proceeding anyway:', error);
+        // Continue without authentication for offline play
+      }
+      navigation.navigate('MatchLoading', { mode: 'bot' });
+    } else {
+      // ONLINE mode - authentication is required
+      try {
+        await ensureAuthenticated();
+        // Request matchmaking before navigation
+        requestMatchmaking();
+        navigation.navigate('MatchLoading', { mode: 'player' });
+      } catch (error) {
+        Alert.alert(
+          'Online Play Authentication Required',
+          'Unable to authenticate for online play. Please check your connection and try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: handleStart,
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ],
+        );
+      }
     }
   };
 
@@ -108,7 +123,7 @@ export const HomeScreen: React.FC = () => {
               <Text style={[typography.bodyPrimary, styles.modeToggleLabel]}>Choose a mode</Text>
               <View style={styles.modeToggle}>
                 <Pressable
-                  accessibilityLabel="Play against the bot"
+                  accessibilityLabel="Play offline against the bot"
                   accessibilityRole="button"
                   accessibilityState={{ selected: isBotMode }}
                   onPress={() => setSelectedMode('bot')}
@@ -125,11 +140,11 @@ export const HomeScreen: React.FC = () => {
                       isBotMode && styles.modeOptionTextActive,
                     ]}
                   >
-                    Bot Mode
+                    OFFLINE
                   </Text>
                 </Pressable>
                 <Pressable
-                  accessibilityLabel="Play against other players"
+                  accessibilityLabel="Play online against other players"
                   accessibilityRole="button"
                   accessibilityState={{ selected: !isBotMode }}
                   onPress={() => setSelectedMode('player')}
@@ -146,7 +161,7 @@ export const HomeScreen: React.FC = () => {
                       !isBotMode && styles.modeOptionTextActive,
                     ]}
                   >
-                    Player Mode
+                    ONLINE
                   </Text>
                 </Pressable>
               </View>

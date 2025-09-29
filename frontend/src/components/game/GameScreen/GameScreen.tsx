@@ -77,6 +77,11 @@ export const GameScreen: React.FC = () => {
     resetGame();
   }, [resetGame]);
 
+  const handleGoHome = useCallback(() => {
+    resetGame();
+    navigation.navigate('Home');
+  }, [navigation, resetGame]);
+
   const handleLeaveGame = useCallback(() => {
     resetGame();
     navigation.navigate('Home');
@@ -190,7 +195,12 @@ export const GameScreen: React.FC = () => {
           <View style={styles.footer}>
             {isGameComplete ? (
               <>
-                <CustomButton label="Play Again" onPress={handlePlayAgain} />
+                <CustomButton label="Go Home" onPress={handleGoHome} variant="secondary" />
+                <CustomButton
+                  label="Play Again"
+                  onPress={handlePlayAgain}
+                  style={styles.playAgainButton}
+                />
                 <TextButton
                   label="View Leaderboard"
                   onPress={handleLeaderboard}
@@ -286,6 +296,9 @@ const styles = StyleSheet.create({
   footer: {
     width: '100%',
     paddingTop: spacing.lg,
+  },
+  playAgainButton: {
+    marginTop: spacing.sm,
   },
   leaderboardButton: {
     marginTop: spacing.sm,

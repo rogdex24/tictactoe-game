@@ -3,7 +3,7 @@ import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMatchmaking } from '../../../state/MatchmakingContext';
@@ -34,6 +34,8 @@ export const PlayerGameScreen: React.FC = () => {
     isSendingMove,
     sendMove,
     cleanupMatchmaking,
+    resetMatchState,
+    requestMatchmaking,
     resultLabel,
     resultTone,
   } = useMatchmaking();
@@ -49,17 +51,38 @@ export const PlayerGameScreen: React.FC = () => {
     [sendMove],
   );
 
-  const handlePlayAgain = useCallback(() => {
-    // For multiplayer, we would need to start a new match
-    // For now, just go back to home to restart matchmaking
+  const handleGoHome = useCallback(async () => {
+    console.log('🏠 Going home without playing again');
+    await cleanupMatchmaking();
+    resetMatchState();
     navigation.navigate('Home');
-  }, [navigation]);
+  }, [cleanupMatchmaking, resetMatchState, navigation]);
+
+  const handlePlayAgain = useCallback(async () => {
+    console.log('🎮 Play again requested - cleaning up and starting new matchmaking');
+    // Clean up current match and reset all state
+    await cleanupMatchmaking();
+    resetMatchState();
+    // Request new matchmaking and navigate to loading screen
+    requestMatchmaking();
+    navigation.navigate('MatchLoading', { mode: 'player' });
+  }, [cleanupMatchmaking, resetMatchState, requestMatchmaking, navigation]);
 
   const handleLeaveGame = useCallback(async () => {
-    console.log('🏠 Navigating back to home, stopping matchmaking');
+    console.log('🏠 Navigating back to home, stopping matchmaking and resetting state');
     await cleanupMatchmaking();
+    resetMatchState();
     navigation.navigate('Home');
-  }, [cleanupMatchmaking, navigation]);
+  }, [cleanupMatchmaking, resetMatchState, navigation]);
+
+  // Auto-reset match state when game completes (but keep it visible until user navigates away)
+  useEffect(() => {
+    if (phase === 'complete') {
+      console.log('🏁 Game completed, will reset state on next navigation');
+      // Don't reset immediately - let user see the result
+      // State will be reset when they click "Play Again" or "Leave Game"
+    }
+  }, [phase]);
 
   const boardDisabled =
     phase !== 'playing' ||
@@ -117,20 +140,6 @@ export const PlayerGameScreen: React.FC = () => {
       } else if (resultTone === 'forfeit') {
         return colors.textSecondary;
       }
-
-      // Fallback to old logic if no result tone
-      if (winningCells) {
-        const winningCell = winningCells[0];
-        const winningMark = board[winningCell];
-        if (winningMark === yourMark) {
-          return winningMark === 'X' ? colors.accentMint : colors.accentTealSoft;
-        } else {
-          return colors.accentDanger;
-        }
-      } else {
-        // It's a draw
-        return colors.accentDraw;
-      }
     }
 
     if (!opponentConnected) {
@@ -138,7 +147,7 @@ export const PlayerGameScreen: React.FC = () => {
     }
 
     return currentTurnMark === 'X' ? colors.accentMint : colors.textTealHighlight;
-  }, [currentTurnMark, phase, winningCells, board, yourMark, opponentConnected, resultTone]);
+  }, [currentTurnMark, phase, yourMark, opponentConnected, resultTone]);
 
   const isGameComplete = phase === 'complete';
 
@@ -181,7 +190,12 @@ export const PlayerGameScreen: React.FC = () => {
           <View style={styles.footer}>
             {isGameComplete ? (
               <>
-                <CustomButton label="Play Again" onPress={handlePlayAgain} />
+                <CustomButton label="Go Home" onPress={handleGoHome} variant="secondary" />
+                <CustomButton
+                  label="Play Again"
+                  onPress={handlePlayAgain}
+                  style={styles.playAgainButton}
+                />
                 <TextButton
                   label="View Leaderboard"
                   onPress={handleLeaderboard}
@@ -269,6 +283,9 @@ const styles = StyleSheet.create({
   footer: {
     width: '100%',
     paddingTop: spacing.lg,
+  },
+  playAgainButton: {
+    marginTop: spacing.sm,
   },
   leaderboardButton: {
     marginTop: spacing.sm,

@@ -88,12 +88,15 @@ interface MatchmakingContextValue {
   resultLabel: string | null;
   resultTone: ResultTone | null;
   isSendingMove: boolean;
+  isMatchmakingRequested: boolean; // Track if user explicitly requested matchmaking
 
   // Actions
   startMatchmaking: () => Promise<void>;
   cleanupMatchmaking: () => Promise<void>;
   sendMove: (index: number) => void;
   resetBoard: () => void;
+  resetMatchState: () => void;
+  requestMatchmaking: () => void; // User explicitly requests matchmaking
 
   // Match reference for direct access
   currentMatch: Match | null;
@@ -128,6 +131,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
   const [resultLabel, setResultLabel] = React.useState<string | null>(null);
   const [resultTone, setResultTone] = React.useState<ResultTone | null>(null);
   const [isSendingMove, setIsSendingMove] = React.useState(false);
+  const [isMatchmakingRequested, setIsMatchmakingRequested] = React.useState(false);
 
   // Refs
   const socketRef = React.useRef<Socket | null>(null);
@@ -151,6 +155,37 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     setIsSendingMove(false);
   }, []);
 
+  // Reset all match state function
+  const resetMatchState = React.useCallback(() => {
+    console.log('🧹 Resetting all match state');
+    setPhase('connecting');
+    setStatusMessage('Ready to start matchmaking...');
+    setBoard(createEmptyBoard());
+    setWinningCells(null);
+    setCurrentTurnMark(null);
+    setYourMark(null);
+    setOpponentName(null);
+    setOpponentConnected(false);
+    setMode(MATCH_MODE_CLASSIC);
+    setErrorMessage(null);
+    setResultLabel(null);
+    setResultTone(null);
+    setIsSendingMove(false);
+    setIsMatchmakingRequested(false); // Clear matchmaking intent
+
+    // Clear any stale processed tickets
+    processedTicketsRef.current.clear();
+    // Ensure matchmaking is marked as inactive
+    isMatchmakingActiveRef.current = false;
+    isJoiningMatchRef.current = false;
+  }, []);
+
+  // Request matchmaking function - called when user explicitly wants to start matchmaking
+  const requestMatchmaking = React.useCallback(() => {
+    console.log('🎯 User explicitly requested matchmaking');
+    setIsMatchmakingRequested(true);
+  }, []);
+
   // Cleanup matchmaking function
   const cleanupMatchmaking = React.useCallback(async () => {
     const socket = socketRef.current;
@@ -158,6 +193,9 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     const match = matchRef.current;
 
     console.log('🧹 Cleaning up matchmaking state');
+
+    // Set flag to prevent any new matchmaking until cleanup is complete
+    isMatchmakingActiveRef.current = false;
 
     // Remove socket handlers first
     if (cleanupHandlersRef.current) {
@@ -170,6 +208,8 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
       try {
         await socket.leaveMatch(match.match_id);
         console.log('✅ Left match:', match.match_id);
+        // Small delay to ensure server processes the leave
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         console.warn('Failed to leave match:', error);
       }
@@ -185,21 +225,28 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
       }
     }
 
-    // Disconnect socket
+    // Disconnect socket completely
     if (socket) {
       try {
         await nakamaService.disconnectSocket();
         console.log('✅ Disconnected from socket');
+        // Additional delay to ensure server processes the disconnect
+        await new Promise((resolve) => setTimeout(resolve, 300));
       } catch (error) {
         console.warn('Failed to disconnect socket:', error);
       }
     }
 
+    // Clear all processed tickets to prevent stale state
+    processedTicketsRef.current.clear();
+
     // Reset all refs
     socketRef.current = null;
     ticketRef.current = null;
     matchRef.current = null;
-    isMatchmakingActiveRef.current = false;
+    isJoiningMatchRef.current = false;
+
+    console.log('🧹 Matchmaking cleanup complete');
   }, []);
 
   // Handle match error
@@ -551,12 +598,34 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
 
   // Start matchmaking
   const startMatchmaking = React.useCallback(async () => {
+    console.log('🚀 Starting matchmaking...');
+    console.log('🔍 Current state:', {
+      isMatchmakingActive: isMatchmakingActiveRef.current,
+      phase,
+      hasSocket: !!socketRef.current,
+      hasMatch: !!matchRef.current,
+      hasTicket: !!ticketRef.current,
+      isMatchmakingRequested,
+    });
+
+    // Only start matchmaking if user explicitly requested it
+    if (!isMatchmakingRequested) {
+      console.log('⚠️ Matchmaking not requested by user, skipping');
+      return;
+    }
+
     if (isMatchmakingActiveRef.current) {
       console.log('⚠️ Matchmaking already active, skipping');
       return;
     }
 
-    console.log('🚀 Starting matchmaking...');
+    // Additional safety check - don't start if we're in a non-connecting phase
+    if (phase !== 'connecting' && phase !== 'error') {
+      console.log('⚠️ Matchmaking cannot start, current phase:', phase);
+      return;
+    }
+
+    console.log('✅ Starting fresh matchmaking session...');
     isMatchmakingActiveRef.current = true;
     isJoiningMatchRef.current = false;
     processedTicketsRef.current.clear();
@@ -589,7 +658,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         'Unable to connect to matchmaking. Please check your connection and try again.',
       );
     }
-  }, [attachSocketHandlers]);
+  }, [attachSocketHandlers, phase, isMatchmakingRequested]);
 
   // Send move
   const sendMove = React.useCallback(
@@ -651,12 +720,15 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     resultLabel,
     resultTone,
     isSendingMove,
+    isMatchmakingRequested,
 
     // Actions
     startMatchmaking,
     cleanupMatchmaking,
     sendMove,
     resetBoard,
+    resetMatchState,
+    requestMatchmaking,
 
     // Match reference
     currentMatch: matchRef.current,

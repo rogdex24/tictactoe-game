@@ -24,12 +24,25 @@ const MatchLoadingContentPlayer: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { playerName } = usePlayer();
   const { ensureAuthenticated } = useAuthCheck();
-  const matchmakingContext = useMatchmaking(); // Safe to call here since we're in provider context
+  const {
+    phase,
+    startMatchmaking,
+    cleanupMatchmaking,
+    currentMatch,
+    statusMessage,
+    opponentName,
+    opponentConnected,
+    mode,
+    resultLabel,
+    resultTone,
+    errorMessage,
+    isMatchmakingRequested,
+  } = useMatchmaking(); // Destructure specific properties
 
   const handleCancel = React.useCallback(() => {
-    matchmakingContext.cleanupMatchmaking();
+    cleanupMatchmaking();
     navigation.navigate('Home');
-  }, [navigation, matchmakingContext]);
+  }, [navigation, cleanupMatchmaking]);
 
   const handleMatchSuccess = React.useCallback(() => {
     // Navigate to PlayerGame when match is ready
@@ -38,23 +51,47 @@ const MatchLoadingContentPlayer: React.FC = () => {
 
   React.useEffect(() => {
     const initializeMatchmaking = async () => {
+      console.log('🖼️ MatchLoadingScreen initializing matchmaking...');
+      console.log('🖼️ Current matchmaking phase:', phase);
+      console.log('🖼️ Matchmaking requested:', isMatchmakingRequested);
+
+      // Only start matchmaking if user explicitly requested it
+      if (!isMatchmakingRequested) {
+        console.log('⚠️ MatchLoadingScreen: Matchmaking not requested by user, skipping');
+        return;
+      }
+
+      // Don't start matchmaking if we're already in an active state
+      if (phase === 'playing' || phase === 'joining' || phase === 'matching') {
+        console.log(
+          '⚠️ MatchLoadingScreen: Matchmaking already in progress, skipping initialization',
+        );
+        return;
+      }
+
       try {
         await ensureAuthenticated();
-        await matchmakingContext.startMatchmaking();
+        console.log('🚀 MatchLoadingScreen: Starting fresh matchmaking...');
+        await startMatchmaking();
       } catch (error) {
         console.error('Failed to initialize matchmaking:', error);
       }
     };
 
-    initializeMatchmaking();
-  }, [ensureAuthenticated, matchmakingContext]);
+    // Only initialize if we're in a clean state and matchmaking was requested
+    if ((phase === 'connecting' || phase === 'error') && isMatchmakingRequested) {
+      initializeMatchmaking();
+    } else {
+      console.log('🖼️ MatchLoadingScreen: Skipping initialization, current phase:', phase);
+    }
+  }, [ensureAuthenticated, phase, startMatchmaking, isMatchmakingRequested]);
 
   // Handle phase changes for player mode - navigate when match is ready
   React.useEffect(() => {
-    if (matchmakingContext.phase === 'playing' && matchmakingContext.currentMatch) {
+    if (phase === 'playing' && currentMatch) {
       handleMatchSuccess();
     }
-  }, [matchmakingContext.phase, matchmakingContext.currentMatch, handleMatchSuccess]);
+  }, [phase, currentMatch, handleMatchSuccess]);
 
   return (
     <LinearGradient
@@ -72,14 +109,14 @@ const MatchLoadingContentPlayer: React.FC = () => {
               {`Hi, ${playerName || 'Player'}!`}
             </Text>
             <MatchStatusCard
-              phase={matchmakingContext.phase}
-              statusMessage={matchmakingContext.statusMessage}
-              opponentName={matchmakingContext.opponentName}
-              opponentConnected={matchmakingContext.opponentConnected}
-              mode={matchmakingContext.mode}
-              resultLabel={matchmakingContext.resultLabel}
-              resultTone={matchmakingContext.resultTone}
-              errorMessage={matchmakingContext.errorMessage}
+              phase={phase}
+              statusMessage={statusMessage}
+              opponentName={opponentName}
+              opponentConnected={opponentConnected}
+              mode={mode}
+              resultLabel={resultLabel}
+              resultTone={resultTone}
+              errorMessage={errorMessage}
               showSpinner={true}
             />
           </View>

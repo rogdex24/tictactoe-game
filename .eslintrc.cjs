@@ -36,5 +36,20 @@ module.exports = {
       },
     ],
   },
-  ignorePatterns: ['**/dist/**', '**/build/**', '**/node_modules/**'],
+  ignorePatterns: ['**/dist/**', '**/build/**', '**/node_modules/**', '**/*.js', '**/*.cjs'],
+  overrides: [
+    {
+      files: ['**/*.js'],
+      parser: 'espree',
+      parserOptions: {
+        ecmaVersion: 2021,
+        sourceType: 'module',
+      },
+      extends: ['eslint:recommended'],
+      rules: {
+        'no-unused-vars': 'warn',
+        'no-console': 'off',
+      },
+    },
+  ],
 };
