@@ -276,10 +276,6 @@ const styles = StyleSheet.create({
     flex: 3,
     textAlign: 'center',
   },
-  timeHeader: {
-    flex: 1,
-    textAlign: 'center',
-  },
   gamesHeader: {
     flex: 1.2,
     textAlign: 'center',
@@ -382,12 +378,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textPrimary,
     fontFamily: typography.fontFamilyBold,
-  },
-  timeCell: {
-    flex: 2,
-    ...typography.bodyPrimary,
-    textAlign: 'center',
-    color: colors.textMuted,
   },
   scoreCell: {
     flex: 1.5,
