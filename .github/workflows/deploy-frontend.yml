@@ -1,4 +1,4 @@
-name: Frontend Production Deployment
+name: Frontend Deployment
 
 on:
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
           echo "EXPO_PUBLIC_NAKAMA_SERVER_HOST=${{ vars.NAKAMA_SERVER_HOST || 'api.tictactoe.kauntalha.dev' }}" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_NAKAMA_SERVER_PORT=${{ secrets.NAKAMA_SERVER_PORT || '7350' }}" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_NAKAMA_SERVER_KEY=${{ secrets.NAKAMA_SERVER_KEY || 'defaultkey' }}" >> $GITHUB_ENV
-          echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ secrets.NAKAMA_USE_SSL || 'false' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ vars.NAKAMA_USE_SSL || 'true' }}" >> $GITHUB_ENV
 
       - name: Build React Native Web (Production)
         working-directory: frontend

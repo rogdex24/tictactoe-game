@@ -58,6 +58,12 @@ The server setup script (`server-deploy-setup.sh`) will:
 3. **Run the SSL setup script**:
 
    ```bash
+   ./ssl-setup-complete.sh
+   ```
+
+   **Alternative**: Use the legacy setup script:
+
+   ```bash
    ./setup-ssl.sh
    ```
 
@@ -71,6 +77,21 @@ The server setup script (`server-deploy-setup.sh`) will:
    - Obtain Let's Encrypt SSL certificates
    - Configure Nginx with real certificates
    - Set up automatic certificate renewal
+
+4. **If SSL certificate issues occur**:
+
+   The new consolidated script includes fix capabilities:
+
+   ```bash
+   # Fix existing certificate loading issues
+   ./ssl-setup-complete.sh --fix
+
+   # Verify certificate is working
+   ./ssl-setup-complete.sh --verify
+
+   # Test complete SSL setup
+   ./ssl-setup-complete.sh --test
+   ```
 
 ## 🐳 Step 3: Start the Nakama Backend
 
@@ -156,6 +177,10 @@ Certificates will auto-renew via the created cron job. To manually renew:
 
 ```bash
 cd ~/tictactoe-game/backend
+# Using the new consolidated script (recommended)
+./ssl-setup-complete.sh --renew
+
+# Or using the legacy renewal script
 ./setup-ssl.sh --renew
 ```
 
@@ -193,6 +218,56 @@ After successful deployment:
 
 ## 🆘 Troubleshooting
 
+### SSL Certificate Issues
+
+If you encounter SSL certificate problems, use the comprehensive troubleshooting tools:
+
+1. **Complete SSL diagnostics**:
+
+   ```bash
+   cd ~/tictactoe-game/backend
+   ./troubleshoot-ssl.sh
+   ```
+
+   This script checks DNS, ports, ACME challenges, certificate status, and provides specific recommendations.
+
+2. **Fix SSL certificate loading**:
+
+   ```bash
+   ./ssl-setup-complete.sh --fix
+   ```
+
+   Automatically detects and fixes common certificate loading issues.
+
+3. **Debug SSL step-by-step**:
+
+   ```bash
+   ./debug-ssl.sh
+   ```
+
+   Manual certificate testing with detailed logging.
+
+4. **Verify SSL is working**:
+   ```bash
+   ./ssl-setup-complete.sh --verify
+   ```
+   Quick check to ensure Let's Encrypt certificate is properly loaded.
+
+### Common SSL Issues and Solutions
+
+- **"SSL certificate problem: self signed certificate"**:
+  - Run `./ssl-setup-complete.sh --fix`
+  - The issue is usually nginx not loading the Let's Encrypt certificate
+
+- **"No such authorization" during certificate request**:
+  - Ensure domain points to your server IP: `nslookup api.tictactoe.kauntalha.dev`
+  - Check firewall allows port 80: `sudo ufw allow 80`
+  - Run `./troubleshoot-ssl.sh` for detailed diagnostics
+
+- **Certificate exists but HTTPS doesn't work**:
+  - Restart nginx: `docker compose restart nginx`
+  - Or use the fix command: `./ssl-setup-complete.sh --fix`
+
 ### Services won't start:
 
 ```bash
@@ -206,13 +281,19 @@ docker compose logs
 sudo systemctl restart docker
 ```
 
-### SSL certificate issues:
+### Legacy SSL certificate issues:
 
 ```bash
 # Check certificate status
 docker compose logs certbot
 
-# Force certificate renewal
+# Using the new consolidated script (recommended)
+./ssl-setup-complete.sh --fix
+
+# Verify certificate is working properly
+./ssl-setup-complete.sh --verify
+
+# Force certificate renewal (legacy method)
 ./setup-ssl.sh --renew
 ```
 
@@ -246,15 +327,19 @@ After deployment, your server will have:
 ```
 ~/tictactoe-game/
 ├── backend/
-│   ├── docker-compose.yml    # Main service configuration
-│   ├── nginx.conf           # Nginx reverse proxy config
-│   ├── setup-ssl.sh         # SSL certificate setup script
-│   ├── renew-certs.sh       # Auto-generated renewal script
-│   └── ssl/                 # Self-signed certificates (fallback)
+│   ├── docker-compose.yml           # Main service configuration
+│   ├── nginx.conf                   # Nginx reverse proxy config
+│   ├── ssl-setup-complete.sh        # Complete SSL setup script (recommended)
+│   ├── setup-ssl.sh                 # Legacy SSL certificate setup script
+│   ├── fix-ssl.sh                   # SSL troubleshooting script
+│   ├── troubleshoot-ssl.sh          # SSL diagnostics script
+│   ├── debug-ssl.sh                 # SSL debugging script
+│   ├── renew-certs.sh               # Auto-generated renewal script
+│   └── ssl/                         # Self-signed certificates (fallback)
 ├── scripts/
-│   ├── server-deploy-setup.sh  # Server initialization
-│   └── gcp-vm-setup.sh         # GCP VM helper
-└── .env                     # Environment configuration
+│   ├── server-deploy-setup.sh       # Server initialization
+│   └── gcp-vm-setup.sh              # GCP VM helper
+└── .env                             # Environment configuration
 ```
 
 ## ✅ Success Checklist
