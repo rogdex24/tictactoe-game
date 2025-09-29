@@ -420,7 +420,7 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
         if (payload.currentMark === gameBoard.yourMark) {
           setStatusMessage('Match started. Your turn!');
         } else {
-          setStatusMessage('Your turn to play.');
+          setStatusMessage("Opponent's turn...");
         }
       } else if (kind === 'update') {
         if (payload.currentMark === gameBoard.yourMark) {
