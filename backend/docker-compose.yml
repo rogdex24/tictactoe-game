@@ -18,6 +18,9 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+    networks:
+      - nakama_network
+
   nakama:
     container_name: nakama
     build: .
@@ -46,5 +49,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - nakama_network
+
+  nginx:
+    container_name: nginx-proxy
+    image: nginx:alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - certbot_data:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - nakama
+    restart: unless-stopped
+    networks:
+      - nakama_network
+
+  certbot:
+    container_name: certbot
+    image: certbot/certbot
+    volumes:
+      - certbot_data:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@kauntalha.dev --agree-tos --no-eff-email -d api.tictactoe.kauntalha.dev
+    depends_on:
+      - nginx
+
 volumes:
   data:
+  certbot_data:
+  certbot_www:
+
+networks:
+  nakama_network:
+    driver: bridge

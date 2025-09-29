@@ -39,7 +39,7 @@
       "./scripts/format-go.sh",
       "./scripts/lint-go.sh"
     ],
-    "*": [
+    "!(**/vendor/**)*.{json,md,yml,yaml}": [
       "pnpm exec prettier --write --ignore-unknown"
     ]
   }

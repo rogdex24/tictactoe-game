@@ -1,0 +1,42 @@
+# Git and CI/CD
+.git
+.github
+.gitignore
+
+# Development files
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+
+# Build artifacts
+build/
+bin/
+*.so
+*.exe
+
+# Documentation
+README.md
+*.md
+
+# Docker files
+Dockerfile*
+docker-compose*
+
+# Temporary files
+.tmp/
+*.tmp
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Node modules (if any)
+node_modules/
+
+# Go specific
+*.test
+*.prof
+coverage.out

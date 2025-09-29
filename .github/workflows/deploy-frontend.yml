@@ -1,4 +1,4 @@
-name: Frontend Production Deployment
+name: Frontend Deployment
 
 on:
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: '20'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Wrangler at workspace root
+        run: pnpm add wrangler@latest --workspace-root
+
       - name: Lint frontend
         run: pnpm --filter frontend lint
 
@@ -64,10 +67,9 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "EXPO_PUBLIC_NAKAMA_SERVER_HOST=${{ secrets.NAKAMA_SERVER_HOST || '127.0.0.1' }}" >> $GITHUB_ENV
-          echo "EXPO_PUBLIC_NAKAMA_SERVER_PORT=${{ secrets.NAKAMA_SERVER_PORT || '7350' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_SERVER_HOST=${{ vars.NAKAMA_SERVER_HOST || 'api.tictactoe.kauntalha.dev' }}" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_NAKAMA_SERVER_KEY=${{ secrets.NAKAMA_SERVER_KEY || 'defaultkey' }}" >> $GITHUB_ENV
-          echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ secrets.NAKAMA_USE_SSL || 'false' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ vars.NAKAMA_USE_SSL || 'true' }}" >> $GITHUB_ENV
 
       - name: Build React Native Web (Production)
         working-directory: frontend
@@ -80,8 +82,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=tictactoe-game --compatibility-date=2024-09-29
+          command: pages deploy dist --project-name=tictactoe-game
           workingDirectory: frontend
+          packageManager: pnpm
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 

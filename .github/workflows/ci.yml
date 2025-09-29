@@ -1,4 +1,4 @@
-name: CI
+name: Project CI
 
 on:
   pull_request:
@@ -49,9 +49,9 @@ jobs:
           restore-keys: |
             \${{ runner.os }}-go-
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.5.0
           working-directory: backend
           only-new-issues: true
       - name: Run backend tests

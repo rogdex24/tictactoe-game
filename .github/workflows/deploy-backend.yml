@@ -1,4 +1,4 @@
-name: Backend Production Deployment
+name: Backend Deployment
 
 on:
   workflow_dispatch:
@@ -78,14 +78,6 @@ jobs:
             # Ensure we're in the app directory
             cd "$APP_DIR"
 
-
-            # Stop current services
-            echo "🛑 Stopping current backend services..."
-            cd "$BACKEND_DIR" || cd "$APP_DIR"
-            if [ -f "docker-compose.yml" ]; then
-              sudo docker compose down || docker-compose down || true
-            fi
-
             # Update repository
             echo "📡 Fetching latest changes..."
             git fetch origin --prune
@@ -106,17 +98,12 @@ jobs:
               echo "⚠️  WARNING: Please update .env with production values!"
             fi
 
-
-            # Clean up old containers and images
-            echo "🧹 Cleaning up old containers and images..."
-            sudo docker system prune -f || true
-
             # Build and deploy
             echo "🏗️  Building and starting backend services..."
-            echo "📝 Using command: sudo docker compose down && sudo docker compose up --build -d"
+            echo "📝 Using command: docker compose down nakama && docker compose up --build -d nakama"
 
-            # Execute the exact command from AGENTS.md
-            sudo docker compose down && sudo docker compose up --build -d
+            # Execute the command to up and build only the Nakama server
+            docker compose down nakama && docker compose up --build -d nakama
 
             # Wait for services to be ready
             echo "⏳ Waiting for services to start..."
@@ -132,7 +119,7 @@ jobs:
             echo "🎯 Environment: ${{ github.event.inputs.environment }}"
             echo ""
             echo "📊 Service Status:"
-            sudo docker compose ps
+            docker compose ps
             echo ""
             echo "🌐 Server should be available at:"
             echo "- Nakama API: http://$(curl -s ifconfig.me):7350"
@@ -150,7 +137,7 @@ jobs:
           echo "### Deployment Process" >> $GITHUB_STEP_SUMMARY
           echo "1. ✅ Repository updated and checkout completed" >> $GITHUB_STEP_SUMMARY
           echo "2. ✅ Backend services stopped and rebuilt" >> $GITHUB_STEP_SUMMARY
-          echo "3. ✅ sudo docker containers started successfully" >> $GITHUB_STEP_SUMMARY
+          echo "3. ✅ docker containers started successfully" >> $GITHUB_STEP_SUMMARY
           echo "4. ✅ Health checks passed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**🎯 Backend is now live and serving requests!**" >> $GITHUB_STEP_SUMMARY
@@ -166,6 +153,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⚠️ Please check the workflow logs for details and consider:" >> $GITHUB_STEP_SUMMARY
           echo "- Verifying GCP VM access and permissions" >> $GITHUB_STEP_SUMMARY
-          echo "- Checking sudo docker and sudo docker compose installation" >> $GITHUB_STEP_SUMMARY
+          echo "- Checking docker and docker compose installation" >> $GITHUB_STEP_SUMMARY
           echo "- Reviewing application logs on the server" >> $GITHUB_STEP_SUMMARY
           echo "- Restoring from backup if necessary" >> $GITHUB_STEP_SUMMARY
