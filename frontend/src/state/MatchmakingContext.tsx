@@ -10,10 +10,10 @@ import React from 'react';
 
 import { nakamaService } from '../services/nakama';
 
+import { useGameBoard, type PlayerMark, GameBoardProvider } from './GameBoardContext';
+
 // Types
-type PlayerMark = 'X' | 'O';
 type MatchPhase = 'connecting' | 'matching' | 'joining' | 'playing' | 'complete' | 'error';
-type ResultTone = 'win' | 'loss' | 'draw' | 'forfeit';
 
 type ServerPlayer = {
   userId: string;
@@ -46,11 +46,7 @@ const MATCHMAKER_QUERY = '*'; // Server-authoritative query for Go plugin
 const MATCH_OPCODE_GAME_START = 1;
 const MATCH_OPCODE_BOARD_UPDATE = 2;
 const MATCH_OPCODE_GAME_OVER = 3;
-const MATCH_OPCODE_PLAYER_MOVE = 4;
 const MATCH_OPCODE_ERROR = 5;
-
-// Utility functions
-const createEmptyBoard = (): (PlayerMark | null)[] => Array(9).fill(null);
 
 const decodeMatchData = (data: Uint8Array | string): string => {
   if (typeof data === 'string') {
@@ -77,24 +73,16 @@ interface MatchmakingContextValue {
   // Match state
   phase: MatchPhase;
   statusMessage: string;
-  board: (PlayerMark | null)[];
-  winningCells: number[] | null;
-  currentTurnMark: PlayerMark | null;
-  yourMark: PlayerMark | null;
   opponentName: string | null;
   opponentConnected: boolean;
   mode: string;
   errorMessage: string | null;
-  resultLabel: string | null;
-  resultTone: ResultTone | null;
-  isSendingMove: boolean;
   isMatchmakingRequested: boolean; // Track if user explicitly requested matchmaking
 
   // Actions
   startMatchmaking: () => Promise<void>;
   cleanupMatchmaking: () => Promise<void>;
-  sendMove: (index: number) => void;
-  resetBoard: () => void;
+  sendMove: (index: number) => void; // Delegate to GameBoardContext
   resetMatchState: () => void;
   requestMatchmaking: () => void; // User explicitly requests matchmaking
 
@@ -117,20 +105,41 @@ interface MatchmakingProviderProps {
 }
 
 export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ children }) => {
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const handleMoveError = React.useCallback((error: string) => {
+    setErrorMessage(error);
+  }, []);
+
+  return (
+    <GameBoardProvider onMoveError={handleMoveError}>
+      <MatchmakingContextProvider errorMessage={errorMessage} setErrorMessage={setErrorMessage}>
+        {children}
+      </MatchmakingContextProvider>
+    </GameBoardProvider>
+  );
+};
+
+interface MatchmakingContextProviderProps {
+  children: React.ReactNode;
+  errorMessage: string | null;
+  setErrorMessage: (error: string | null) => void;
+}
+
+const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
+  children,
+  errorMessage,
+  setErrorMessage,
+}) => {
+  // Get game board context to update game state
+  const gameBoard = useGameBoard();
+
   // State
   const [phase, setPhase] = React.useState<MatchPhase>('connecting');
   const [statusMessage, setStatusMessage] = React.useState('Connecting to matchmaking...');
-  const [board, setBoard] = React.useState<(PlayerMark | null)[]>(createEmptyBoard);
-  const [winningCells, setWinningCells] = React.useState<number[] | null>(null);
-  const [currentTurnMark, setCurrentTurnMark] = React.useState<PlayerMark | null>(null);
-  const [yourMark, setYourMark] = React.useState<PlayerMark | null>(null);
   const [opponentName, setOpponentName] = React.useState<string | null>(null);
   const [opponentConnected, setOpponentConnected] = React.useState(false);
   const [mode, setMode] = React.useState(MATCH_MODE_CLASSIC);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [resultLabel, setResultLabel] = React.useState<string | null>(null);
-  const [resultTone, setResultTone] = React.useState<ResultTone | null>(null);
-  const [isSendingMove, setIsSendingMove] = React.useState(false);
   const [isMatchmakingRequested, setIsMatchmakingRequested] = React.useState(false);
 
   // Refs
@@ -144,33 +153,16 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
   const processedTicketsRef = React.useRef(new Set<string>()); // Track processed tickets
   const isMatchmakingActiveRef = React.useRef(false); // Track matchmaking state without causing re-renders
 
-  // Reset board function
-  const resetBoard = React.useCallback(() => {
-    setBoard(createEmptyBoard());
-    setWinningCells(null);
-    setCurrentTurnMark(null);
-    setYourMark(null);
-    setResultLabel(null);
-    setResultTone(null);
-    setIsSendingMove(false);
-  }, []);
-
   // Reset all match state function
   const resetMatchState = React.useCallback(() => {
     console.log('🧹 Resetting all match state');
     setPhase('connecting');
     setStatusMessage('Ready to start matchmaking...');
-    setBoard(createEmptyBoard());
-    setWinningCells(null);
-    setCurrentTurnMark(null);
-    setYourMark(null);
+    gameBoard.resetBoard();
     setOpponentName(null);
     setOpponentConnected(false);
     setMode(MATCH_MODE_CLASSIC);
     setErrorMessage(null);
-    setResultLabel(null);
-    setResultTone(null);
-    setIsSendingMove(false);
     setIsMatchmakingRequested(false); // Clear matchmaking intent
 
     // Clear any stale processed tickets
@@ -178,13 +170,21 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     // Ensure matchmaking is marked as inactive
     isMatchmakingActiveRef.current = false;
     isJoiningMatchRef.current = false;
-  }, []);
+  }, [gameBoard, setErrorMessage]);
 
   // Request matchmaking function - called when user explicitly wants to start matchmaking
   const requestMatchmaking = React.useCallback(() => {
     console.log('🎯 User explicitly requested matchmaking');
     setIsMatchmakingRequested(true);
   }, []);
+
+  // Send move function - delegates to game board context
+  const sendMove = React.useCallback(
+    (index: number) => {
+      gameBoard.sendMove(index, socketRef.current, matchRef.current, phase, opponentConnected);
+    },
+    [gameBoard, phase, opponentConnected],
+  );
 
   // Cleanup matchmaking function
   const cleanupMatchmaking = React.useCallback(async () => {
@@ -250,16 +250,19 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
   }, []);
 
   // Handle match error
-  const handleMatchError = React.useCallback((message: MatchData) => {
-    console.error('❌ Match error received:', message);
-    const payload = decodeMatchData(message.data);
-    const error: ErrorPayload = JSON.parse(payload);
-    const errorMsg = error.message || 'An unknown error occurred';
+  const handleMatchError = React.useCallback(
+    (message: MatchData) => {
+      console.error('❌ Match error received:', message);
+      const payload = decodeMatchData(message.data);
+      const error: ErrorPayload = JSON.parse(payload);
+      const errorMsg = error.message || 'An unknown error occurred';
 
-    setPhase('error');
-    setStatusMessage('Match error occurred');
-    setErrorMessage(errorMsg);
-  }, []);
+      setPhase('error');
+      setStatusMessage('Match error occurred');
+      setErrorMessage(errorMsg);
+    },
+    [setErrorMessage],
+  );
 
   // Handle match state updates
   const handleMatchState = React.useCallback(
@@ -283,12 +286,12 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
       // Update board if provided
       if (payload.board) {
         const newBoard = payload.board.map((cell) => (cell === '' ? null : (cell as PlayerMark)));
-        setBoard(newBoard);
+        gameBoard.updateBoard(newBoard);
       }
 
       // Update current turn
       if (payload.currentMark) {
-        setCurrentTurnMark(payload.currentMark as PlayerMark);
+        gameBoard.updateCurrentTurnMark(payload.currentMark as PlayerMark);
       }
 
       // Update players and marks
@@ -300,7 +303,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         const opponent = payload.players.find((p) => p.userId !== session.user_id);
 
         if (selfPlayer) {
-          setYourMark(selfPlayer.mark);
+          gameBoard.updateYourMark(selfPlayer.mark);
         }
 
         if (opponent) {
@@ -338,7 +341,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
 
       // Handle winning condition
       if (payload.winningCells && payload.winningCells.length > 0) {
-        setWinningCells(payload.winningCells);
+        gameBoard.updateWinningCells(payload.winningCells);
       }
 
       // Handle match completion
@@ -347,31 +350,31 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
 
         if (payload.result === 'draw') {
           setStatusMessage('The match ended in a draw.');
-          setResultLabel('Draw');
-          setResultTone('draw');
+          gameBoard.updateResultLabel('Draw');
+          gameBoard.updateResultTone('draw');
         } else if (payload.result === 'forfeit') {
           if (payload.winnerUserId === nakamaService.getSession()?.user_id) {
             setStatusMessage('Opponent forfeited the match. You win!');
-            setResultLabel('Victory (Forfeit)');
-            setResultTone('win');
+            gameBoard.updateResultLabel('Victory (Forfeit)');
+            gameBoard.updateResultTone('win');
           } else {
             setStatusMessage('You left the match.');
-            setResultLabel('Forfeit');
-            setResultTone('forfeit');
+            gameBoard.updateResultLabel('Forfeit');
+            gameBoard.updateResultTone('forfeit');
           }
         } else if (payload.winnerUserId === nakamaService.getSession()?.user_id) {
           setStatusMessage('You won the match!');
-          setResultLabel('Victory');
-          setResultTone('win');
+          gameBoard.updateResultLabel('Victory');
+          gameBoard.updateResultTone('win');
         } else {
           setStatusMessage('Your opponent won the match.');
-          setResultLabel('Defeat');
-          setResultTone('loss');
+          gameBoard.updateResultLabel('Defeat');
+          gameBoard.updateResultTone('loss');
         }
       } else if (kind === 'start') {
         setPhase('playing');
-        setResultLabel(null);
-        setResultTone(null);
+        gameBoard.updateResultLabel(null);
+        gameBoard.updateResultTone(null);
 
         // Ensure we have opponent information when game starts
         if (payload.players && payload.players.length >= 2) {
@@ -405,25 +408,25 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         }
 
         setStatusMessage(
-          `Match started! You are ${yourMark || 'waiting for assignment'}. ${
-            payload.currentMark === yourMark ? "It's your turn!" : "Opponent's turn."
+          `Match started! You are ${gameBoard.yourMark || 'waiting for assignment'}. ${
+            payload.currentMark === gameBoard.yourMark ? "It's your turn!" : "Opponent's turn."
           }`,
         );
 
-        if (payload.currentMark === yourMark) {
+        if (payload.currentMark === gameBoard.yourMark) {
           setStatusMessage('Match started. Your turn!');
         } else {
           setStatusMessage('Your turn to play.');
         }
       } else if (kind === 'update') {
-        if (payload.currentMark === yourMark) {
+        if (payload.currentMark === gameBoard.yourMark) {
           setStatusMessage("It's your turn!");
         } else {
           setStatusMessage("Opponent's turn...");
         }
       }
     },
-    [yourMark, opponentName],
+    [gameBoard, opponentName],
   );
 
   // Handle match data
@@ -445,75 +448,78 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         handleMatchError(message);
       }
 
-      setIsSendingMove(false);
+      gameBoard.setIsSendingMove(false);
     },
-    [handleMatchState, handleMatchError],
+    [handleMatchState, handleMatchError, gameBoard],
   );
 
   // Handle match found
-  const handleMatchFound = React.useCallback(async (socket: Socket, matched: MatchmakerMatched) => {
-    if (isJoiningMatchRef.current || !isMountedRef.current) {
-      console.log('⚠️ Already joining a match or component unmounted, skipping');
-      return;
-    }
-
-    // Check if this ticket has already been processed
-    const ticketId = matched.ticket;
-    if (processedTicketsRef.current.has(ticketId)) {
-      console.log('⚠️ Ticket already processed:', ticketId);
-      return;
-    }
-
-    processedTicketsRef.current.add(ticketId);
-    isJoiningMatchRef.current = true;
-
-    console.log('🎯 Match found! Joining server-authoritative match...', matched.match_id);
-    setPhase('joining');
-    setStatusMessage('Match found! Joining...');
-
-    try {
-      // Store the session user ID for later reference
-      const session = nakamaService.getSession();
-      if (session) {
-        selfUserIdRef.current = session.user_id || null;
+  const handleMatchFound = React.useCallback(
+    async (socket: Socket, matched: MatchmakerMatched) => {
+      if (isJoiningMatchRef.current || !isMountedRef.current) {
+        console.log('⚠️ Already joining a match or component unmounted, skipping');
+        return;
       }
 
-      // Join the match using the match ID provided by the Go plugin
-      if (matched.match_id) {
-        console.log('🔗 Joining server-authoritative match:', matched.match_id);
-        const match = await socket.joinMatch(matched.match_id);
-        matchRef.current = match;
-      } else {
-        throw new Error('No match ID provided by server-authoritative matchmaker');
+      // Check if this ticket has already been processed
+      const ticketId = matched.ticket;
+      if (processedTicketsRef.current.has(ticketId)) {
+        console.log('⚠️ Ticket already processed:', ticketId);
+        return;
       }
 
-      console.log('✅ Successfully joined match:', matchRef.current.match_id);
-      console.log('👥 Match participants:', matchRef.current.presences?.length || 0);
+      processedTicketsRef.current.add(ticketId);
+      isJoiningMatchRef.current = true;
 
-      // Remove the matchmaker ticket since we found a match
-      if (ticketRef.current) {
-        try {
-          await socket.removeMatchmaker(ticketRef.current.ticket);
-          console.log('✅ Removed matchmaker ticket after joining match');
-        } catch (ticketError) {
-          console.warn('Failed to remove ticket after joining match:', ticketError);
+      console.log('🎯 Match found! Joining server-authoritative match...', matched.match_id);
+      setPhase('joining');
+      setStatusMessage('Match found! Joining...');
+
+      try {
+        // Store the session user ID for later reference
+        const session = nakamaService.getSession();
+        if (session) {
+          selfUserIdRef.current = session.user_id || null;
         }
-        ticketRef.current = null;
-      }
 
-      console.log('🎮 Setting phase to playing...');
-      setPhase('playing');
-      setStatusMessage('Joined match! Waiting for game to start...');
-      console.log('🎮 Successfully set phase to playing');
-    } catch (error) {
-      console.error('❌ Failed to join match:', error);
-      setPhase('error');
-      setStatusMessage('Failed to join match');
-      setErrorMessage('Unable to join the match. Please try again.');
-    } finally {
-      isJoiningMatchRef.current = false;
-    }
-  }, []);
+        // Join the match using the match ID provided by the Go plugin
+        if (matched.match_id) {
+          console.log('🔗 Joining server-authoritative match:', matched.match_id);
+          const match = await socket.joinMatch(matched.match_id);
+          matchRef.current = match;
+        } else {
+          throw new Error('No match ID provided by server-authoritative matchmaker');
+        }
+
+        console.log('✅ Successfully joined match:', matchRef.current.match_id);
+        console.log('👥 Match participants:', matchRef.current.presences?.length || 0);
+
+        // Remove the matchmaker ticket since we found a match
+        if (ticketRef.current) {
+          try {
+            await socket.removeMatchmaker(ticketRef.current.ticket);
+            console.log('✅ Removed matchmaker ticket after joining match');
+          } catch (ticketError) {
+            console.warn('Failed to remove ticket after joining match:', ticketError);
+          }
+          ticketRef.current = null;
+        }
+
+        console.log('🎮 Setting phase to playing...');
+        setPhase('playing');
+        setStatusMessage('Joined match! Waiting for game to start...');
+        console.log('🎮 Successfully set phase to playing');
+      } catch (error) {
+        console.error('❌ Failed to join match:', error);
+        setPhase('error');
+        setStatusMessage('Failed to join match');
+        setErrorMessage('Unable to join the match. Please try again.');
+      } finally {
+        isJoiningMatchRef.current = false;
+      }
+    },
+    [setErrorMessage],
+  );
 
   // Attach socket handlers
   const attachSocketHandlers = React.useCallback(
@@ -658,39 +664,7 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
         'Unable to connect to matchmaking. Please check your connection and try again.',
       );
     }
-  }, [attachSocketHandlers, phase, isMatchmakingRequested]);
-
-  // Send move
-  const sendMove = React.useCallback(
-    (index: number) => {
-      if (
-        phase !== 'playing' ||
-        !socketRef.current ||
-        !matchRef.current ||
-        !yourMark ||
-        currentTurnMark !== yourMark ||
-        isSendingMove ||
-        board[index] !== null ||
-        !opponentConnected
-      ) {
-        return;
-      }
-
-      setIsSendingMove(true);
-      setErrorMessage(null);
-
-      const payload = JSON.stringify({ index });
-
-      socketRef.current
-        .sendMatchState(matchRef.current.match_id, MATCH_OPCODE_PLAYER_MOVE, payload)
-        .catch((error) => {
-          console.error('Failed to submit move', error);
-          setErrorMessage('Failed to submit move. Please try again.');
-          setIsSendingMove(false);
-        });
-    },
-    [board, currentTurnMark, isSendingMove, opponentConnected, phase, yourMark],
-  );
+  }, [attachSocketHandlers, phase, isMatchmakingRequested, setErrorMessage]);
 
   // Initialize component
   React.useEffect(() => {
@@ -709,24 +683,16 @@ export const MatchmakingProvider: React.FC<MatchmakingProviderProps> = ({ childr
     // State
     phase,
     statusMessage,
-    board,
-    winningCells,
-    currentTurnMark,
-    yourMark,
     opponentName,
     opponentConnected,
     mode,
     errorMessage,
-    resultLabel,
-    resultTone,
-    isSendingMove,
     isMatchmakingRequested,
 
     // Actions
     startMatchmaking,
     cleanupMatchmaking,
     sendMove,
-    resetBoard,
     resetMatchState,
     requestMatchmaking,
 

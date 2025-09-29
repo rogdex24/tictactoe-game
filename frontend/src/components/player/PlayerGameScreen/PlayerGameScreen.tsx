@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useMemo, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useGameBoard } from '../../../state/GameBoardContext';
 import { useMatchmaking } from '../../../state/MatchmakingContext';
 import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
@@ -22,23 +23,20 @@ export const PlayerGameScreen: React.FC = () => {
   const { playerName } = usePlayer();
   const displayName = playerName || 'Player';
 
-  // Use matchmaking context for all match state and actions
+  // Use matchmaking context for match state and actions
   const {
     phase,
-    board,
-    winningCells,
-    currentTurnMark,
-    yourMark,
     opponentName,
     opponentConnected,
-    isSendingMove,
     sendMove,
     cleanupMatchmaking,
     resetMatchState,
     requestMatchmaking,
-    resultLabel,
-    resultTone,
   } = useMatchmaking();
+
+  // Use game board context for game state
+  const { board, winningCells, currentTurnMark, yourMark, resultLabel, resultTone, isSendingMove } =
+    useGameBoard();
 
   const handleLeaderboard = useCallback(() => {
     navigation.navigate('Leaderboard');
