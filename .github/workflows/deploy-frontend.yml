@@ -1,0 +1,97 @@
+name: Frontend Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy React Native Web App to Cloudflare Pages
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        run: pnpm --filter frontend lint
+
+      - name: Run frontend tests
+        run: pnpm --filter frontend test
+
+      - name: Type check frontend
+        run: pnpm --filter frontend typecheck
+
+      - name: Set environment variables
+        run: |
+          echo "EXPO_PUBLIC_NAKAMA_SERVER_HOST=${{ secrets.NAKAMA_SERVER_HOST || '127.0.0.1' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_SERVER_PORT=${{ secrets.NAKAMA_SERVER_PORT || '7350' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_SERVER_KEY=${{ secrets.NAKAMA_SERVER_KEY || 'defaultkey' }}" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ secrets.NAKAMA_USE_SSL || 'false' }}" >> $GITHUB_ENV
+
+      - name: Build React Native Web (Production)
+        working-directory: frontend
+        run: pnpm run build:web:prod
+        env:
+          NODE_ENV: production
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=tictactoe-game --compatibility-date=2024-09-29
+          workingDirectory: frontend
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Add deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.event.inputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed to:** Cloudflare Pages" >> $GITHUB_STEP_SUMMARY
+          echo "**Project:** tictactoe-game" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Frontend successfully built and deployed!" >> $GITHUB_STEP_SUMMARY

@@ -7,11 +7,24 @@ export GOTOOLCHAIN="${GOTOOLCHAIN:-$GO_TOOLCHAIN_VERSION}"
 
 # pin exact tool versions to keep CI and local environments in sync
 GOIMPORTS_VERSION="v0.27.0"
-GOLANGCI_LINT_VERSION="v1.64.0"
 
 printf 'Installing Go tools with toolchain %s\n' "$GOTOOLCHAIN"
 
 go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
+
+# Install golangci-lint
+# docs: https://golangci-lint.run/docs/welcome/install/#local-installation
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    if command -v brew >/dev/null 2>&1; then
+        brew install golangci-lint || brew upgrade golangci-lint
+    else
+        echo "Homebrew not found. Installing golangci-lint using go install instead."
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    fi
+else
+    # Not macOS, use go install
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+fi
 
 echo "Go tooling installed in $(go env GOBIN || echo "$(go env GOPATH)/bin")"

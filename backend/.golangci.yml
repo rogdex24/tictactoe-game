@@ -1,4 +1,4 @@
-version: 2
+version: '2'
 
 run:
   timeout: 5m
@@ -7,10 +7,12 @@ run:
 issues:
   max-issues-per-linter: 50
   max-same-issues: 10
-  exclude-dirs:
-    - vendor
-    - node_modules
-    - .git
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*_generated\\.go$"
+
+linters:
+  exclusions:
+    paths:
+      - vendor/
+      - node_modules/
+      - .git/
+      - ".*\\.pb\\.go$"
+      - ".*_generated\\.go$"
