@@ -48,18 +48,6 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
   errorMessage,
   showSpinner = true,
 }) => {
-  // Log mode display information for debugging
-  React.useEffect(() => {
-    console.log('📊 MatchStatusCard render:', {
-      phase,
-      mode,
-      statusMessage,
-      opponentName,
-      opponentConnected,
-      resultLabel,
-      resultTone,
-    });
-  }, [phase, mode, statusMessage, opponentName, opponentConnected, resultLabel, resultTone]);
 
   const isLoadingPhase = phase === 'connecting' || phase === 'matching' || phase === 'joining';
   const resultColor = toneToColor(resultTone ?? null);
