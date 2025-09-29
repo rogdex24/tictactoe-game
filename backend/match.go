@@ -18,6 +18,16 @@ const (
 	opcodeError       int64 = 5
 )
 
+// Scoring formula constants
+const (
+	pointsWin  = 3
+	pointsDraw = 1
+	pointsLoss = -1
+)
+
+// External references
+const leaderboardIDMatch = "ttt_leaderboard" // Reference to leaderboard ID
+
 type playerSlot struct {
 	Presence  runtime.Presence
 	Username  string
@@ -26,17 +36,18 @@ type playerSlot struct {
 }
 
 type matchState struct {
-	Mode         string
-	Board        [9]string
-	Players      map[string]*playerSlot
-	CurrentMark  string
-	MoveCount    int
-	WinnerMark   string
-	WinnerUserID string
-	WinningCells []int
-	Completed    bool
-	Result       string
-	Started      bool
+	Mode               string
+	Board              [9]string
+	Players            map[string]*playerSlot
+	CurrentMark        string
+	MoveCount          int
+	WinnerMark         string
+	WinnerUserID       string
+	WinningCells       []int
+	Completed          bool
+	Result             string
+	Started            bool
+	LeaderboardUpdated bool // Flag to prevent duplicate leaderboard updates
 }
 
 type matchStatePayload struct {
@@ -111,7 +122,16 @@ func (h *TicTacToeMatchHandler) MatchJoinAttempt(_ context.Context, logger runti
 func (h *TicTacToeMatchHandler) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, presences []runtime.Presence) interface{} {
 	gameState := state.(*matchState)
 
+	logger.Info("👥 PLAYERS JOINING MATCH",
+		"presenceCount", len(presences),
+		"existingPlayerCount", len(gameState.Players),
+		"matchStarted", gameState.Started)
+
 	for _, presence := range presences {
+		logger.Info("👤 Processing player join",
+			"userId", presence.GetUserId(),
+			"username", presence.GetUsername(),
+			"sessionId", presence.GetSessionId())
 		player, exists := gameState.Players[presence.GetUserId()]
 		if !exists {
 			assignedMark, err := nextAvailableMark(gameState.Players)
@@ -139,7 +159,7 @@ func (h *TicTacToeMatchHandler) MatchJoin(ctx context.Context, logger runtime.Lo
 	return gameState
 }
 
-func (h *TicTacToeMatchHandler) MatchLeave(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, presences []runtime.Presence) interface{} {
+func (h *TicTacToeMatchHandler) MatchLeave(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, presences []runtime.Presence) interface{} {
 	gameState := state.(*matchState)
 
 	for _, presence := range presences {
@@ -161,9 +181,16 @@ func (h *TicTacToeMatchHandler) MatchLeave(ctx context.Context, logger runtime.L
 	}
 
 	if gameState.Completed {
+		logger.Info("🏁 MATCH COMPLETED - Broadcasting and updating leaderboard",
+			"matchCompleted", gameState.Completed,
+			"result", gameState.Result,
+			"trigger", "MatchLeave")
 		h.broadcastBoardState(ctx, logger, dispatcher, gameState)
 		h.broadcastGameOver(ctx, logger, dispatcher, gameState)
+		// Update leaderboard when match ends due to forfeit
+		updateMatchResults(ctx, logger, nk, gameState)
 	} else {
+		logger.Info("📊 Match not completed yet after leave", "completed", gameState.Completed)
 		h.broadcastBoardState(ctx, logger, dispatcher, gameState)
 	}
 
@@ -174,13 +201,13 @@ func (h *TicTacToeMatchHandler) MatchTerminate(ctx context.Context, _ runtime.Lo
 	return state
 }
 
-func (h *TicTacToeMatchHandler) MatchLoop(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, messages []runtime.MatchData) interface{} {
+func (h *TicTacToeMatchHandler) MatchLoop(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, _ int64, state interface{}, messages []runtime.MatchData) interface{} {
 	gameState := state.(*matchState)
 
 	for _, message := range messages {
 		switch message.GetOpCode() {
 		case opcodePlayerMove:
-			h.handleMove(ctx, logger, dispatcher, gameState, message)
+			h.handleMove(ctx, logger, nk, dispatcher, gameState, message)
 		default:
 			logger.Warn("Received unsupported opcode", "op_code", message.GetOpCode())
 		}
@@ -193,7 +220,7 @@ func (h *TicTacToeMatchHandler) MatchSignal(ctx context.Context, _ runtime.Logge
 	return state, ""
 }
 
-func (h *TicTacToeMatchHandler) handleMove(ctx context.Context, logger runtime.Logger, dispatcher runtime.MatchDispatcher, state *matchState, message runtime.MatchData) {
+func (h *TicTacToeMatchHandler) handleMove(ctx context.Context, logger runtime.Logger, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, state *matchState, message runtime.MatchData) {
 	if state.Completed {
 		h.sendError(dispatcher, message, "match already completed")
 		return
@@ -263,7 +290,19 @@ func (h *TicTacToeMatchHandler) handleMove(ctx context.Context, logger runtime.L
 	h.broadcastBoardState(ctx, logger, dispatcher, state)
 
 	if state.Completed {
+		logger.Info("🏁 MATCH COMPLETED - Broadcasting and updating leaderboard",
+			"matchCompleted", state.Completed,
+			"result", state.Result,
+			"trigger", "handleMove",
+			"winnerUserId", state.WinnerUserID,
+			"winnerMark", state.WinnerMark)
 		h.broadcastGameOver(ctx, logger, dispatcher, state)
+		// Update leaderboard when match ends normally (win/draw)
+		updateMatchResults(ctx, logger, nk, state)
+	} else {
+		logger.Info("🎮 Match continues - not completed yet",
+			"currentMark", state.CurrentMark,
+			"moveCount", state.MoveCount)
 	}
 }
 
@@ -390,4 +429,218 @@ func checkForWinner(board [9]string) (string, []int) {
 
 func (h *TicTacToeMatchHandler) String() string {
 	return fmt.Sprintf("%s match handler", matchModuleName)
+}
+
+// Leaderboard helper functions
+
+// calculateScore computes the score based on W/L/D record using the formula:
+// Score = Base(100) + 3*wins + 1*draws - 1*losses
+// Base score ensures all scores remain positive, even with many losses
+func calculateScore(wins, losses, draws int64) int64 {
+	baseScore := int64(100) // Ensures scores stay positive
+	return baseScore + pointsWin*wins + pointsDraw*draws + pointsLoss*losses
+}
+
+// getPlayerStats fetches current stats for a player from the leaderboard
+func getPlayerStats(ctx context.Context, nk runtime.NakamaModule, userID string) (*playerStats, error) {
+	_, ownerRecords, _, _, err := nk.LeaderboardRecordsList(ctx, leaderboardIDMatch, []string{userID}, 1, "", 0)
+	if err != nil {
+		return nil, fmt.Errorf("fetch player record: %w", err)
+	}
+
+	stats := &playerStats{
+		Wins:   0,
+		Losses: 0,
+		Draws:  0,
+		Games:  0,
+	}
+
+	if len(ownerRecords) > 0 && ownerRecords[0].Metadata != "" {
+		if err := json.Unmarshal([]byte(ownerRecords[0].Metadata), stats); err != nil {
+			return nil, fmt.Errorf("parse player metadata: %w", err)
+		}
+	}
+
+	return stats, nil
+}
+
+// updatePlayerLeaderboard updates a player's leaderboard entry with new match result
+func updatePlayerLeaderboard(ctx context.Context, logger runtime.Logger, nk runtime.NakamaModule, userID, username string, result string) error {
+	logger.Info("🔍 FETCHING current player stats", "userId", userID, "username", username)
+
+	// Fetch current stats
+	stats, err := getPlayerStats(ctx, nk, userID)
+	if err != nil {
+		logger.Error("❌ FAILED to get player stats", "userId", userID, "error", err)
+		return fmt.Errorf("get player stats: %w", err)
+	}
+
+	logger.Info("📊 Current player stats BEFORE update",
+		"userId", userID,
+		"wins", stats.Wins,
+		"losses", stats.Losses,
+		"draws", stats.Draws,
+		"games", stats.Games)
+
+	// Update stats based on result
+	switch result {
+	case "win":
+		stats.Wins++
+		logger.Info("🏆 Incrementing WINS", "userId", userID, "newWins", stats.Wins)
+	case "loss":
+		stats.Losses++
+		logger.Info("💔 Incrementing LOSSES", "userId", userID, "newLosses", stats.Losses)
+	case "draw":
+		stats.Draws++
+		logger.Info("🤝 Incrementing DRAWS", "userId", userID, "newDraws", stats.Draws)
+	default:
+		logger.Error("❌ INVALID result type", "result", result, "userId", userID)
+		return fmt.Errorf("invalid result: %s", result)
+	}
+	stats.Games++
+
+	logger.Info("📊 Updated player stats AFTER increment",
+		"userId", userID,
+		"wins", stats.Wins,
+		"losses", stats.Losses,
+		"draws", stats.Draws,
+		"games", stats.Games)
+
+	// Calculate new score
+	newScore := calculateScore(stats.Wins, stats.Losses, stats.Draws)
+	logger.Info("🧮 Calculated new score",
+		"userId", userID,
+		"formula", "100 + 3*wins + 1*draws - 1*losses",
+		"calculation", fmt.Sprintf("100 + 3*%d + 1*%d - 1*%d", stats.Wins, stats.Draws, stats.Losses),
+		"newScore", newScore)
+
+	// Prepare metadata
+	metadata := map[string]interface{}{
+		"wins":   stats.Wins,
+		"losses": stats.Losses,
+		"draws":  stats.Draws,
+		"games":  stats.Games,
+	}
+
+	logger.Info("💾 WRITING to leaderboard",
+		"leaderboardId", leaderboardIDMatch,
+		"userId", userID,
+		"username", username,
+		"score", newScore,
+		"metadata", metadata)
+
+	// Write to leaderboard
+	if _, err := nk.LeaderboardRecordWrite(ctx, leaderboardIDMatch, userID, username, newScore, int64(0), metadata, nil); err != nil {
+		logger.Error("❌ FAILED to write leaderboard record",
+			"userId", userID,
+			"username", username,
+			"score", newScore,
+			"error", err)
+		return fmt.Errorf("write leaderboard record: %w", err)
+	}
+
+	logger.Info("✅ SUCCESS: Updated player leaderboard",
+		"userId", userID,
+		"username", username,
+		"result", result,
+		"newScore", newScore,
+		"wins", stats.Wins,
+		"losses", stats.Losses,
+		"draws", stats.Draws,
+		"games", stats.Games)
+
+	return nil
+}
+
+// updateMatchResults handles leaderboard updates for all players when a match ends
+func updateMatchResults(ctx context.Context, logger runtime.Logger, nk runtime.NakamaModule, state *matchState) {
+	// Prevent duplicate leaderboard updates
+	if state.LeaderboardUpdated {
+		logger.Info("⚠️ LEADERBOARD ALREADY UPDATED - Skipping duplicate update",
+			"completed", state.Completed,
+			"result", state.Result)
+		return
+	}
+
+	// Mark as updated to prevent duplicates
+	state.LeaderboardUpdated = true
+
+	logger.Info("📊 LEADERBOARD UPDATE START",
+		"completed", state.Completed,
+		"result", state.Result,
+		"winnerMark", state.WinnerMark,
+		"winnerUserId", state.WinnerUserID,
+		"playerCount", len(state.Players))
+
+	// Log all players in the match
+	for userID, slot := range state.Players {
+		logger.Info("👤 Player in match",
+			"userId", userID,
+			"username", slot.Username,
+			"mark", slot.Mark,
+			"connected", slot.Connected)
+	}
+
+	if !state.Completed {
+		logger.Warn("⚠️ SKIPPING: Attempted to update leaderboard for incomplete match")
+		return
+	}
+
+	logger.Info("🎯 Processing leaderboard updates for all players...")
+
+	for userID, slot := range state.Players {
+		// Determine result for this player
+		var result string
+		switch state.Result {
+		case "win":
+			if userID == state.WinnerUserID {
+				result = "win"
+				logger.Info("🏆 Player is WINNER", "userId", userID, "username", slot.Username)
+			} else {
+				result = "loss"
+				logger.Info("💔 Player is LOSER", "userId", userID, "username", slot.Username)
+			}
+		case "draw":
+			result = "draw"
+			logger.Info("🤝 Player has DRAW", "userId", userID, "username", slot.Username)
+		case "forfeit":
+			if userID == state.WinnerUserID {
+				result = "win" // Winner by forfeit
+				logger.Info("🏆 Player WINS by forfeit", "userId", userID, "username", slot.Username)
+			} else {
+				result = "loss" // Lost by forfeit
+				logger.Info("💔 Player LOSES by forfeit", "userId", userID, "username", slot.Username)
+			}
+		default:
+			logger.Error("❌ Unknown match result type", "result", state.Result, "userId", userID)
+			continue
+		}
+
+		// Update player's leaderboard entry
+		username := slot.Username
+		if username == "" {
+			username = fmt.Sprintf("User_%s", userID[:8]) // Fallback username
+			logger.Warn("⚠️ Using fallback username", "userId", userID, "fallback", username)
+		}
+
+		logger.Info("🔄 Attempting leaderboard update",
+			"userId", userID,
+			"username", username,
+			"result", result)
+
+		if err := updatePlayerLeaderboard(ctx, logger, nk, userID, username, result); err != nil {
+			logger.Error("❌ FAILED to update leaderboard for player",
+				"userId", userID,
+				"username", username,
+				"result", result,
+				"error", err)
+		} else {
+			logger.Info("✅ SUCCESS: Updated leaderboard for player",
+				"userId", userID,
+				"username", username,
+				"result", result)
+		}
+	}
+
+	logger.Info("🎉 LEADERBOARD UPDATE COMPLETE - All players processed")
 }
