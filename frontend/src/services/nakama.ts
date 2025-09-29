@@ -25,7 +25,8 @@ interface LeaderboardResponse {
 // Nakama server configuration from environment variables
 const NAKAMA_SERVER_KEY = process.env.EXPO_PUBLIC_NAKAMA_SERVER_KEY || 'defaultkey';
 const NAKAMA_SERVER_HOST = process.env.EXPO_PUBLIC_NAKAMA_SERVER_HOST || '127.0.0.1';
-const NAKAMA_SERVER_PORT = process.env.EXPO_PUBLIC_NAKAMA_SERVER_PORT || '7350';
+// No Fallback to default port if not set, as prod uses ssl on the domain
+const NAKAMA_SERVER_PORT = process.env.EXPO_PUBLIC_NAKAMA_SERVER_PORT || '';
 const NAKAMA_USE_SSL = process.env.EXPO_PUBLIC_NAKAMA_USE_SSL === 'true';
 
 // Storage keys for tokens and device ID

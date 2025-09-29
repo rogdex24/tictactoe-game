@@ -68,7 +68,6 @@ jobs:
       - name: Set environment variables
         run: |
           echo "EXPO_PUBLIC_NAKAMA_SERVER_HOST=${{ vars.NAKAMA_SERVER_HOST || 'api.tictactoe.kauntalha.dev' }}" >> $GITHUB_ENV
-          echo "EXPO_PUBLIC_NAKAMA_SERVER_PORT=${{ vars.NAKAMA_SERVER_PORT || '' }}" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_NAKAMA_SERVER_KEY=${{ secrets.NAKAMA_SERVER_KEY || 'defaultkey' }}" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_NAKAMA_USE_SSL=${{ vars.NAKAMA_USE_SSL || 'true' }}" >> $GITHUB_ENV
 
