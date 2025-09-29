@@ -167,7 +167,6 @@ const MatchmakingContextProvider: React.FC<MatchmakingContextProviderProps> = ({
     setOpponentName(null);
     setOpponentConnected(false);
     // Reset both mode and gameMode to default classic
-    console.log('🔄 Resetting game mode from', gameMode, 'to classic');
     setMode(MATCH_MODE_CLASSIC);
     setGameMode(GAME_MODES.CLASSIC);
     setErrorMessage(null);
