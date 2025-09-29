@@ -60,7 +60,8 @@ fi
 
 REL_FILES=()
 if ((${#CHANGED_FILES[@]} > 0)); then
-  for file in "${CHANGED_FILES[@]}"; do
+  for i in "${!CHANGED_FILES[@]}"; do
+    file="${CHANGED_FILES[i]}"
     if [[ "$file" == backend/* ]]; then
       # Skip vendor files
       if [[ "$file" != backend/vendor/* ]]; then
