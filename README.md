@@ -157,6 +157,27 @@ Copy `.env.example` to `.env` and adjust credentials for local development or CI
 cp .env.example .env
 ```
 
+## Production Deployment
+
+For production deployment with SSL termination and domain setup, see the comprehensive [Production Deployment Guide](./PRODUCTION_DEPLOYMENT.md).
+
+The deployment process involves:
+
+1. **Server Setup**: Use `scripts/gcp-vm-setup.sh` (for GCP) or `scripts/server-deploy-setup.sh` (for any Ubuntu server)
+2. **SSL Configuration**: Run `backend/setup-ssl.sh` to configure Let's Encrypt certificates for `api.tictactoe.kauntalha.dev`
+3. **Service Management**: Use Docker Compose commands to manage the Nakama backend with Nginx reverse proxy
+
+Quick production setup:
+
+```bash
+# On your production server
+curl -sSL https://raw.githubusercontent.com/rogdex24/tictactoe-game/main/scripts/server-deploy-setup.sh | bash
+cd ~/tictactoe-game/backend
+./setup-ssl.sh
+```
+
+Your backend will be accessible at `https://api.tictactoe.kauntalha.dev` with automatic SSL certificate management.
+
 ## Continuous Integration
 
 GitHub Actions workflow (`.github/workflows/ci.yml`) runs linting, tests, builds the Go plugin, and optionally pushes a Docker image to Artifact Registry when pushing to `main`.
