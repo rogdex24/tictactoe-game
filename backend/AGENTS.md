@@ -36,6 +36,7 @@ The backend now implements **server-authoritative matches** with a complete Go p
 **Features Implemented**:
 
 - **Matchmaking**: Custom `RegisterMatchmakerMatched` callback creates authoritative matches
+- **Multiple Game Modes**: Automatic separate queues for different game modes (classic, blitz, etc.)
 - **Game Logic**: Complete server-side Tic-Tac-Toe game rules and validation
 - **Match Lifecycle**: Full `MatchJoinAttempt`, `MatchJoin`, `MatchLoop`, `MatchLeave` handlers
 - **Anti-Cheat**: Server validates all moves and enforces game rules
@@ -44,8 +45,9 @@ The backend now implements **server-authoritative matches** with a complete Go p
 **Current Implementation**:
 
 ```javascript
-// Matchmaker setup with custom properties
-await socket.addMatchmaker('*', 2, 2, { mode: 'classic' }, {});
+// Matchmaker setup with custom properties for different game modes
+await socket.addMatchmaker('*', 2, 2, { mode: 'classic' }, {}); // Classic mode queue
+await socket.addMatchmaker('*', 2, 2, { mode: 'blitz' }, {}); // Blitz mode queue
 
 // Server creates authoritative match and returns match ID
 socket.onmatchmakermatched = (matched) => {
@@ -54,6 +56,61 @@ socket.onmatchmakermatched = (matched) => {
   }
 };
 ```
+
+#### Multiple Game Mode Support ✅
+
+**Location**: `main.go` (RegisterMatchmakerMatched), `match.go` (MatchInit)
+**Status**: ✅ Fully operational with automatic mode separation
+
+**Mode Handling Implementation**:
+
+1. **Mode Extraction** (`main.go` lines 68-87):
+   - Extracts `mode` property from matchmaker entries
+   - Defaults to "classic" if no mode specified
+   - Comprehensive logging for debugging mode extraction
+
+2. **Mode Validation** (`main.go` lines 90-107):
+   - Validates all players in a matchmaking group have the same mode
+   - Prevents mismatched players from being matched together
+   - Returns error if mode mismatch is detected
+
+3. **Match Initialization** (`match.go` lines 84-98):
+   - Accepts mode parameter during match creation
+   - Stores mode in match state for entire game duration
+   - Passes mode to all clients in match state updates
+
+**Separate Queue Mechanism**:
+
+- **Automatic Segmentation**: Nakama's matchmaker automatically creates separate pools based on properties
+- **Property-Based Matching**: Players with `{ mode: 'classic' }` only match with other classic players
+- **Scalable Architecture**: New modes can be added without backend changes
+- **Queue Isolation**: Blitz players never match with classic players, ensuring fair gameplay
+
+**Server-Side Mode Validation**:
+
+```go
+// Mode validation in RegisterMatchmakerMatched callback
+for i, entry := range entries {
+    entryMode := "classic"
+    if properties := entry.GetProperties(); properties != nil {
+        if rawMode, ok := properties["mode"]; ok {
+            if modeValue, ok := rawMode.(string); ok && modeValue != "" {
+                entryMode = modeValue
+            }
+        }
+    }
+
+    if entryMode != mode {
+        return "", fmt.Errorf("mode mismatch: expected %s, got %s", mode, entryMode)
+    }
+}
+```
+
+**Supported Game Modes**:
+
+- ✅ **Classic**: Traditional tic-tac-toe rules
+- ✅ **Blitz**: Same rules, separate matchmaking pool
+- 🔄 **Future Modes**: Architecture supports any new mode without code changes
 
 #### Leaderboard System ✅
 
@@ -150,8 +207,9 @@ leaderboard:
 **Features Complete**:
 
 - **Server-Authoritative Matches**: Full game logic validation and anti-cheat
+- **Multiple Game Mode Support**: Separate queues for classic, blitz, and future modes
 - **Global Leaderboard**: Persistent ranking system with comprehensive statistics
-- **Match Modes**: Support for different game modes (classic, etc.)
+- **Match Modes**: Dynamic mode handling with automatic queue separation
 - **Real-time Communication**: Low-latency WebSocket game state synchronization
 - **RPC API**: RESTful endpoints for leaderboard and player data
 - **Docker Deployment**: Containerized production-ready setup
@@ -159,8 +217,10 @@ leaderboard:
 **Architecture Benefits**:
 
 - **Security**: Server validates all moves, prevents cheating
+- **Mode Isolation**: Separate matchmaking queues ensure fair gameplay
 - **Reliability**: Authoritative game state prevents desynchronization
-- **Scalability**: Nakama's proven multiplayer infrastructure
+- **Scalability**: Nakama's proven multiplayer infrastructure with automatic queue management
+- **Flexibility**: New game modes can be added without backend modifications
 - **Performance**: Efficient real-time communication with minimal latency
 - **Data Persistence**: Permanent leaderboard and player statistics
 
@@ -184,9 +244,14 @@ The system has been successfully migrated from client-relayed matches to full se
 1. **Matchmaking with Server Authority**:
 
 ```typescript
-// Matchmaker connects to server-authoritative matches
+// Matchmaker connects to server-authoritative matches with mode support
 const MATCHMAKER_QUERY = '*'; // Universal query for server matches
+
+// Classic mode matchmaking
 await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, { mode: 'classic' }, {});
+
+// Blitz mode matchmaking
+await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, { mode: 'blitz' }, {});
 ```
 
 2. **Server-Authoritative Match Joining**:
@@ -233,16 +298,18 @@ socket.onmatchdata = (message) => {
 
 #### Server Communication Flow
 
-1. **Matchmaking**: Client requests match via matchmaker
-2. **Server Match**: Server creates authoritative match with game logic
-3. **Join Match**: Client joins using server-provided match ID
-4. **Game Play**: All moves validated by server before state updates
-5. **Game End**: Server determines winner and updates leaderboard automatically
+1. **Matchmaking**: Client requests match via matchmaker with specific game mode
+2. **Mode Validation**: Server validates all players have matching game mode
+3. **Server Match**: Server creates authoritative match with validated game mode
+4. **Join Match**: Client joins using server-provided match ID
+5. **Game Play**: All moves validated by server before state updates
+6. **Game End**: Server determines winner and updates leaderboard automatically
 
 #### Integration Benefits
 
 - **Simplified Client**: No client-side game logic needed
 - **Cheat Prevention**: Server validates all moves and game rules
+- **Mode-Based Matching**: Players only matched with compatible game mode
 - **Reliable State**: Single source of truth prevents desynchronization
 - **Automatic Stats**: Leaderboard updated server-side after each match
 - **Error Handling**: Server provides clear error messages for invalid moves
@@ -255,8 +322,12 @@ socket.onmatchdata = (message) => {
 
 1. **Start Backend**: `docker compose -f backend/docker-compose.yml up --build -d`
 2. **Start Frontend**: `pnpm --filter frontend start`
-3. **Test Multiplayer**: Open multiple clients and test matchmaking
-4. **Verify Leaderboard**: Play matches and check leaderboard updates
+3. **Test Multiple Game Modes**:
+   - Select different modes in UI (Classic vs Blitz)
+   - Verify separate matchmaking queues work correctly
+   - Open multiple clients to test mode-based matching
+4. **Test Multiplayer**: Open multiple clients and test matchmaking
+5. **Verify Leaderboard**: Play matches and check leaderboard updates
 
 #### Key Files
 
@@ -266,7 +337,46 @@ socket.onmatchdata = (message) => {
 - **Frontend Integration**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
 - **Network Service**: `frontend/src/services/nakama.ts`
 
-**Status**: 🎮 **PRODUCTION-READY SERVER-AUTHORITATIVE MULTIPLAYER** 🎮
+**Status**: 🎮 **PRODUCTION-READY SERVER-AUTHORITATIVE MULTIPLAYER WITH MULTIPLE GAME MODES** 🎮
+
+#### Testing Multiple Game Modes
+
+**Verification Steps**:
+
+1. **Start Backend with Logging**:
+
+```bash
+docker compose -f backend/docker-compose.yml up --build -d
+docker compose -f backend/docker-compose.yml logs -f nakama
+```
+
+2. **Test Mode Separation**:
+   - Open two browser tabs/windows
+   - Tab 1: Select "Classic" mode → Start matchmaking
+   - Tab 2: Select "Blitz" mode → Start matchmaking
+   - Result: Players should NOT match (different queues)
+
+3. **Test Same Mode Matching**:
+   - Tab 1: Select "Classic" mode → Start matchmaking
+   - Tab 2: Select "Classic" mode → Start matchmaking
+   - Result: Players SHOULD match and start game
+
+4. **Verify Server Logs**:
+   - Look for mode extraction logs: `🎮 Final mode for match: classic`
+   - Look for match creation logs: `🚀 Creating authoritative match from matchmaking queue: mode=classic`
+   - Look for mode validation logs: `✅ Using extracted mode: mode=classic`
+
+**Expected Log Output**:
+
+```
+🎮 MATCHMAKER CALLBACK TRIGGERED total_entries=2
+🔍 Examining first entry properties properties=map[mode:classic]
+🎯 Found mode property raw_mode=classic
+✅ Using extracted mode mode=classic
+🎮 Final mode for match mode=classic
+🚀 Creating authoritative match from matchmaking queue mode=classic players=2
+✅ Match created successfully match_id=xyz mode=classic
+```
 
 #### API Endpoints
 
