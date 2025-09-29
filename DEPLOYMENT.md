@@ -1,8 +1,21 @@
-# Frontend Deployment Guide
+# Deployment Guide
 
 ## Overview
 
-This repository includes automated deployment of the React Native Web frontend to Cloudflare Pages using GitHub Actions.
+This repository includes automated deployment for both frontend and backend components:
+
+- **Frontend**: React Native Web app deployed to Cloudflare Pages
+- **Backend**: Nakama game server deployed to GCP VM via Docker
+
+## Quick Links
+
+- 🌐 **[Frontend Deployment Guide](#frontend-deployment)** - React Native Web to Cloudflare Pages
+- 🚀 **[Backend Deployment Guide](./BACKEND_DEPLOYMENT.md)** - Nakama server to GCP VM
+- 🔧 **[Server Setup Script](./scripts/server-deploy-setup.sh)** - Automated server provisioning
+
+---
+
+## Frontend Deployment
 
 ## Deployment Workflow
 

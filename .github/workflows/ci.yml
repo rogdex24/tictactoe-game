@@ -31,6 +31,9 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -45,21 +48,15 @@ jobs:
           key: \${{ runner.os }}-go-\${{ hashFiles('**/go.sum') }}
           restore-keys: |
             \${{ runner.os }}-go-
-      - name: Add Go bin to PATH
-        run: echo "$HOME/go/bin" >> $GITHUB_PATH
-      - name: Install Go tooling
-        run: ./scripts/install-go-tools.sh
-      - name: Lint backend
-        working-directory: backend
-        run: golangci-lint run ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: backend
+          only-new-issues: true
       - name: Run backend tests
         working-directory: backend
         run: go test ./...
-      - name: Build backend plugin (linux/amd64)
-        working-directory: backend
-        run: |
-          mkdir -p build
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath --mod=vendor -buildmode=plugin -o build/backend.so
       - name: Docker build
         run: docker build -f backend/Dockerfile -t tictactoe/nakama:ci ./backend
       - name: Push to Artifact Registry

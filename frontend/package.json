@@ -16,8 +16,7 @@
     "test": "jest --passWithNoTests",
     "test:logger": "node scripts/logger-demo.js",
     "test:logger:prod": "NODE_ENV=production node scripts/logger-demo.js",
-    "typecheck": "tsc --noEmit",
-    "build": "node scripts/build-message.cjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@heroiclabs/nakama-js": "^2.8.0",

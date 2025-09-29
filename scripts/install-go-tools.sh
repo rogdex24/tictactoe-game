@@ -7,11 +7,16 @@ export GOTOOLCHAIN="${GOTOOLCHAIN:-$GO_TOOLCHAIN_VERSION}"
 
 # pin exact tool versions to keep CI and local environments in sync
 GOIMPORTS_VERSION="v0.27.0"
-GOLANGCI_LINT_VERSION="v1.64.0"
 
 printf 'Installing Go tools with toolchain %s\n' "$GOTOOLCHAIN"
 
 go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
+
+# Install golangci-lint
+# docs: https://golangci-lint.run/docs/welcome/install/#local-installation
+# For Mac OS
+brew install golangci-lint
+brew upgrade golangci-lint
+
 
 echo "Go tooling installed in $(go env GOBIN || echo "$(go env GOPATH)/bin")"

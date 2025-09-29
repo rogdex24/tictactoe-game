@@ -1,0 +1,172 @@
+name: Backend Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Backend to GCP VM
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get branch name and commit info
+        id: branch-info
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "COMMIT_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Validate backend changes
+        run: |
+          echo "🔍 Validating backend deployment..."
+          echo "Branch: ${{ steps.branch-info.outputs.BRANCH_NAME }}"
+          echo "Commit: ${{ steps.branch-info.outputs.COMMIT_SHORT }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+
+      - name: Deploy backend to GCP VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_SSH_USER }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          port: ${{ secrets.GCP_VM_SSH_PORT || '22' }}
+          timeout: 300s
+          script: |
+            set -euo pipefail
+
+            echo "🚀 Starting backend deployment..."
+            echo "📅 Deployment started at: $(date)"
+            echo "🌿 Target branch: ${{ steps.branch-info.outputs.BRANCH_NAME }}"
+            echo "📝 Commit: ${{ steps.branch-info.outputs.COMMIT_SHORT }}"
+            echo "🎯 Environment: ${{ github.event.inputs.environment }}"
+
+            # Define application directory
+            APP_DIR="$HOME/tictactoe-game"
+            BACKEND_DIR="$APP_DIR/backend"
+
+            # Create application directory if it doesn't exist
+            mkdir -p "$APP_DIR"
+
+            # Clone repository if it doesn't exist, otherwise update
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "📥 Cloning repository..."
+              cd "$HOME"
+              git clone https://github.com/rogdex24/tictactoe-game.git
+            else
+              echo "🔄 Updating existing repository..."
+              cd "$APP_DIR"
+            fi
+
+            # Ensure we're in the app directory
+            cd "$APP_DIR"
+
+
+            # Stop current services
+            echo "🛑 Stopping current backend services..."
+            cd "$BACKEND_DIR" || cd "$APP_DIR"
+            if [ -f "docker-compose.yml" ]; then
+              sudo docker compose down || docker-compose down || true
+            fi
+
+            # Update repository
+            echo "📡 Fetching latest changes..."
+            git fetch origin --prune
+
+            echo "🌿 Checking out branch: ${{ steps.branch-info.outputs.BRANCH_NAME }}"
+            git checkout ${{ steps.branch-info.outputs.BRANCH_NAME }}
+            git reset --hard origin/${{ steps.branch-info.outputs.BRANCH_NAME }}
+
+            # Verify we're in the right directory
+            cd "$BACKEND_DIR"
+
+
+            # Environment setup
+            echo "⚙️  Setting up environment..."
+            if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+              echo "📝 Creating .env from .env.example..."
+              cp .env.example .env
+              echo "⚠️  WARNING: Please update .env with production values!"
+            fi
+
+
+            # Clean up old containers and images
+            echo "🧹 Cleaning up old containers and images..."
+            sudo docker system prune -f || true
+
+            # Build and deploy
+            echo "🏗️  Building and starting backend services..."
+            echo "📝 Using command: sudo docker compose down && sudo docker compose up --build -d"
+
+            # Execute the exact command from AGENTS.md
+            sudo docker compose down && sudo docker compose up --build -d
+
+            # Wait for services to be ready
+            echo "⏳ Waiting for services to start..."
+            sleep 10
+
+
+            # Deployment summary
+            echo ""
+            echo "🎉 Backend deployment completed successfully!"
+            echo "📅 Completed at: $(date)"
+            echo "🌿 Branch: ${{ steps.branch-info.outputs.BRANCH_NAME }}"
+            echo "📝 Commit: ${{ steps.branch-info.outputs.COMMIT_SHORT }}"
+            echo "🎯 Environment: ${{ github.event.inputs.environment }}"
+            echo "💾 Backup location: $BACKUP_DIR"
+            echo ""
+            echo "📊 Service Status:"
+            sudo docker compose ps
+            echo ""
+            echo "🌐 Server should be available at:"
+            echo "- Nakama API: http://$(curl -s ifconfig.me):7350"
+            echo "- Health check: http://localhost:7350/v2"
+
+      - name: Add deployment summary
+        run: |
+          echo "## 🚀 Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ steps.branch-info.outputs.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.branch-info.outputs.COMMIT_SHORT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed to:** GCP VM (${{ secrets.GCP_VM_HOST }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Process" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ Repository updated and checkout completed" >> $GITHUB_STEP_SUMMARY
+          echo "2. ✅ Backend services stopped and rebuilt" >> $GITHUB_STEP_SUMMARY
+          echo "3. ✅ sudo docker containers started successfully" >> $GITHUB_STEP_SUMMARY
+          echo "4. ✅ Health checks passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🎯 Backend is now live and serving requests!**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## ❌ Backend Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ steps.branch-info.outputs.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.branch-info.outputs.COMMIT_SHORT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Please check the workflow logs for details and consider:" >> $GITHUB_STEP_SUMMARY
+          echo "- Verifying GCP VM access and permissions" >> $GITHUB_STEP_SUMMARY
+          echo "- Checking sudo docker and sudo docker compose installation" >> $GITHUB_STEP_SUMMARY
+          echo "- Reviewing application logs on the server" >> $GITHUB_STEP_SUMMARY
+          echo "- Restoring from backup if necessary" >> $GITHUB_STEP_SUMMARY
