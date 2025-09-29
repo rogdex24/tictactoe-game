@@ -15,7 +15,7 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [],
     "ios": {
       "supportsTablet": true
     },
@@ -26,7 +26,21 @@
       }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "TicTacToe Game",
+      "shortName": "TicTacToe",
+      "lang": "en",
+      "scope": "/",
+      "themeColor": "#000000",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "build": {
+        "babel": {
+          "include": ["@react-native/polyfills"]
+        }
+      }
     }
   }
 }
