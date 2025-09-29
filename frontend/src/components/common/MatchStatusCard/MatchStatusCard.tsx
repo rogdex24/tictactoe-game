@@ -64,12 +64,7 @@ export const MatchStatusCard: React.FC<MatchStatusCardProps> = ({
   const isLoadingPhase = phase === 'connecting' || phase === 'matching' || phase === 'joining';
   const resultColor = toneToColor(resultTone ?? null);
 
-  // Log mode formatting
   const displayMode = isValidGameMode(mode) ? getDisplayName(mode) : mode || 'Classic';
-  console.log('🎮 Mode display formatting:', {
-    rawMode: mode,
-    displayMode: displayMode,
-  });
 
   return (
     <View style={styles.statusCard}>
