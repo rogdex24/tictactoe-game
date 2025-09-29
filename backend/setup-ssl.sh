@@ -45,17 +45,55 @@ start_services_initial() {
 obtain_letsencrypt_cert() {
     echo "🔐 Obtaining Let's Encrypt certificate..."
     
-    # Run certbot to get the certificate
-    sudo docker compose run --rm certbot certonly \
+    # First, test if the domain is accessible for ACME challenge
+    echo "🧪 Testing domain accessibility..."
+    
+    # Create a test file for ACME challenge verification
+    docker compose exec nginx mkdir -p /var/www/certbot/.well-known/acme-challenge
+    docker compose exec nginx sh -c 'echo "test-challenge-file" > /var/www/certbot/.well-known/acme-challenge/test'
+    
+    # Test if we can access the challenge file
+    sleep 5
+    if curl -f "http://$DOMAIN/.well-known/acme-challenge/test" >/dev/null 2>&1; then
+        echo "✅ Domain is accessible for ACME challenges"
+        docker compose exec nginx rm -f /var/www/certbot/.well-known/acme-challenge/test
+    else
+        echo "❌ Domain is not accessible for ACME challenges"
+        echo "   Please ensure:"
+        echo "   1. $DOMAIN points to this server's public IP"
+        echo "   2. Port 80 is open and accessible from the internet"
+        echo "   3. No firewall is blocking HTTP traffic"
+        read -p "Continue anyway? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborting certificate setup"
+            return 1
+        fi
+    fi
+    
+    # Run certbot to get the certificate (without sudo)
+    docker compose run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email "$EMAIL" \
         --agree-tos \
         --no-eff-email \
         --force-renewal \
+        --verbose \
         -d "$DOMAIN"
     
-    echo "✅ Let's Encrypt certificate obtained"
+    # Check if certificate was created
+    if docker compose exec nginx test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then
+        echo "✅ Let's Encrypt certificate obtained successfully"
+    else
+        echo "❌ Certificate creation failed"
+        echo "📋 Troubleshooting steps:"
+        echo "   1. Check certbot logs: docker compose logs certbot"
+        echo "   2. Verify domain DNS: nslookup $DOMAIN"
+        echo "   3. Test HTTP access: curl -I http://$DOMAIN/.well-known/acme-challenge/"
+        echo "   4. Check firewall settings"
+        return 1
+    fi
 }
 
 # Function to update nginx config for Let's Encrypt
@@ -67,8 +105,8 @@ update_nginx_config() {
         mv nginx.conf.backup nginx.conf
     fi
     
-    # Reload nginx with new certificates
-    sudo docker compose exec nginx nginx -s reload
+    # Reload nginx with new certificates (without sudo)
+    docker compose exec nginx nginx -s reload
     echo "✅ Nginx configuration updated"
 }
 
