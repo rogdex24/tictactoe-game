@@ -7,7 +7,7 @@ set -e
 
 DOMAIN="api.tictactoe.kauntalha.dev"
 EMAIL="admin@kauntalha.dev"  # Change this to your actual email
-BACKEND_DIR="/Users/abu/Desktop/personal-projects/tictactoe-game/backend"
+BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "🔧 Setting up SSL certificates for $DOMAIN..."
 
