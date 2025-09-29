@@ -75,7 +75,7 @@ services:
     volumes:
       - certbot_data:/etc/letsencrypt
       - certbot_www:/var/www/certbot
-    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@kauntalha.dev --agree-tos --no-eff-email -d kauntalha.dev
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@kauntalha.dev --agree-tos --no-eff-email -d api.tictactoe.kauntalha.dev
     depends_on:
       - nginx
 

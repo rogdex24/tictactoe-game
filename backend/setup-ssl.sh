@@ -5,7 +5,7 @@
 
 set -e
 
-DOMAIN="kauntalha.dev"
+DOMAIN="api.tictactoe.kauntalha.dev"
 EMAIL="admin@kauntalha.dev"  # Change this to your actual email
 BACKEND_DIR="/Users/abu/Desktop/personal-projects/tictactoe-game/backend"
 
@@ -33,8 +33,8 @@ start_services_initial() {
     
     # Update nginx.conf to use local SSL files initially
     cp nginx.conf nginx.conf.backup
-    sed -i.bak 's|/etc/letsencrypt/live/kauntalha.dev/fullchain.pem|/etc/nginx/ssl/fullchain.pem|g' nginx.conf
-    sed -i.bak 's|/etc/letsencrypt/live/kauntalha.dev/privkey.pem|/etc/nginx/ssl/privkey.pem|g' nginx.conf
+    sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/fullchain.pem|/etc/nginx/ssl/fullchain.pem|g' nginx.conf
+    sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/privkey.pem|/etc/nginx/ssl/privkey.pem|g' nginx.conf
     
     docker compose up -d postgres nakama nginx
     sleep 10
@@ -149,7 +149,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo "  --help      Show this help message"
     echo ""
     echo "Environment variables:"
-    echo "  DOMAIN      Domain name (default: kauntalha.dev)"
+    echo "  DOMAIN      Domain name (default: api.tictactoe.kauntalha.dev)"
     echo "  EMAIL       Email for Let's Encrypt (default: admin@kauntalha.dev)"
     exit 0
 elif [[ "$1" == "--renew" ]]; then
