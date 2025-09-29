@@ -4,6 +4,24 @@ import { Client, Session, Socket } from '@heroiclabs/nakama-js';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
+// Leaderboard interfaces
+interface LeaderboardRecord {
+  userId: string;
+  username: string;
+  score: number;
+  rank: number;
+  stats: {
+    wins: number;
+    losses: number;
+    draws: number;
+    games: number;
+  };
+}
+
+interface LeaderboardResponse {
+  records: LeaderboardRecord[];
+}
+
 // Nakama server configuration from environment variables
 const NAKAMA_SERVER_KEY = process.env.EXPO_PUBLIC_NAKAMA_SERVER_KEY || 'defaultkey';
 const NAKAMA_SERVER_HOST = process.env.EXPO_PUBLIC_NAKAMA_SERVER_HOST || '127.0.0.1';
@@ -396,6 +414,41 @@ class NakamaService {
    */
   createSocket(useSSL?: boolean, verbose?: boolean): Socket {
     return this.client.createSocket(useSSL ?? NAKAMA_USE_SSL, verbose ?? false);
+  }
+
+  /**
+   * Get the global leaderboard with player rankings
+   */
+  async getLeaderboard(limit: number = 50): Promise<LeaderboardResponse> {
+    if (!this.currentSession) {
+      throw new Error('No active session. Please authenticate first.');
+    }
+
+    try {
+      const response = await this.client.rpc(this.currentSession, 'get_leaderboard', { limit });
+      // The payload is already an object, no need to JSON.parse
+      return response.payload as LeaderboardResponse;
+    } catch (error) {
+      console.error('Failed to get leaderboard:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get statistics for a specific player
+   */
+  async getPlayerStats(userId: string) {
+    if (!this.currentSession) {
+      throw new Error('No active session. Please authenticate first.');
+    }
+
+    try {
+      const response = await this.client.rpc(this.currentSession, 'get_player_stats', { userId });
+      return response.payload;
+    } catch (error) {
+      console.error('Failed to get player stats:', error);
+      throw error;
+    }
   }
 }
 

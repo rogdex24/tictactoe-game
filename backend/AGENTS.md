@@ -4,238 +4,215 @@
 
 The Tic-Tac-Toe game backend is built on **Nakama** (v3.32.0), an open-source game server that provides matchmaking, real-time multiplayer, and server-authoritative game state management.
 
-#### Restart Server after code changes
+#### Restart Server after code changes to test
+
+NOTE: Mandatory Steps to run else may cause this issue:
+<issue>
+"Failed initializing runtime modules","error":"plugin.Open(\"/nakama/data/modules/backend\"): plugin was built with a different version of package google.golang.org/protobuf/types/known/timestamppb"}
+</issue>
+Make sure to run
+
+````bash
+go mod tidy
+# add the packages needed
+go mod vendor
+``
 
 Delete and build the server again
 
 ```bash
 docker compose -f backend/docker-compose.yml down && docker compose -f backend/docker-compose.yml up --build -d
-```
+````
 
-### Matchmaking Implementation
+### Server Architecture Implementation
 
-We have implemented **two approaches** for matchmaking, with different trade-offs:
+The backend now implements **server-authoritative matches** with a complete Go plugin system.
 
-#### 1. Server-Authoritative Matches (Go Plugin - Currently Disabled)
+#### Server-Authoritative Matches ✅
 
 **Location**: `main.go`, `match.go`
-**Status**: ⚠️ Protobuf version conflict prevents Go plugin loading
+**Status**: ✅ Fully operational with Go plugin
 
-**How it works**:
+**Features Implemented**:
 
-- Go plugin with `RegisterMatchmakerMatched` callback
-- When players are matched, server creates authoritative match using `nk.MatchCreate()`
-- Players receive `matchId` directly and join with `socket.joinMatch(matchId)`
-- Full server-side game logic with `MatchJoinAttempt`, `MatchJoin`, `MatchLoop`, etc.
-- Prevents cheating, ensures game rule enforcement
-
-**Issue**:
-
-```
-plugin was built with a different version of package google.golang.org/protobuf/types/known/timestamppb
-```
-
-#### 2. Client-Relayed Matches (Currently Working) ✅
-
-**Status**: ✅ Fully functional with built-in Nakama features
-
-**How it works**:
-
-- Uses Nakama's built-in matchmaking without custom callbacks
-- Players are matched and receive JWT **tokens** instead of match IDs
-- Token contains encrypted match information: `{ exp: timestamp, mid: "match-uuid" }`
-- Players join using `socket.joinMatch(null, token)` - the **token** creates/joins the match
-- Game data flows directly between clients (client-relayed)
+- **Matchmaking**: Custom `RegisterMatchmakerMatched` callback creates authoritative matches
+- **Game Logic**: Complete server-side Tic-Tac-Toe game rules and validation
+- **Match Lifecycle**: Full `MatchJoinAttempt`, `MatchJoin`, `MatchLoop`, `MatchLeave` handlers
+- **Anti-Cheat**: Server validates all moves and enforces game rules
+- **Leaderboard**: Global ranking system with W/L/D statistics and scoring
 
 **Current Implementation**:
 
 ```javascript
-// Matchmaker setup
+// Matchmaker setup with custom properties
 await socket.addMatchmaker('*', 2, 2, { mode: 'classic' }, {});
 
-// Handle matched event
+// Server creates authoritative match and returns match ID
 socket.onmatchmakermatched = (matched) => {
-  if (matched.token) {
-    // Use token directly - DO NOT extract match ID
-    socket.joinMatch(null, matched.token);
+  if (matched.match_id) {
+    socket.joinMatch(matched.match_id);
   }
 };
 ```
 
-### Key Technical Discoveries
+#### Leaderboard System ✅
 
-#### JWT Token Handling
+**Global Ranking**: Cumulative leaderboard tracks all player performance
 
-- Tokens are JWTs with structure: `{ exp: unixTimestamp, mid: "uuid." }`
-- **Critical**: Use token directly with `joinMatch(null, token)`, not extracted match ID
-- Extracting match ID and using `joinMatch(matchId)` fails with "Match not found"
+- **Scoring Formula**: Win (+3), Draw (+1), Loss (-1)
+- **Statistics**: Wins, Losses, Draws, Total Games, Score
+- **Persistence**: Records stored in Nakama's authoritative leaderboard
+- **Real-time Updates**: Stats updated immediately after each match
+
+**RPC Endpoints**:
+
+- `get_leaderboard`: Fetch top players with rankings and stats
+- `get_player_stats`: Get individual player statistics and rank
 
 #### Match Communication
 
-- Both approaches support real-time game data via WebSocket
-- `socket.sendMatchState(matchId, opCode, jsonData)` sends moves
-- `socket.onmatchdata` receives opponent moves and game updates
-- Match presence events (`onmatchpresence`) track players joining/leaving
+- **Server-Authoritative**: All game moves validated by server
+- **Real-time**: WebSocket communication for game state updates
+- **Opcodes**: `GAME_START`, `BOARD_UPDATE`, `GAME_OVER`, `PLAYER_MOVE`, `ERROR`
+- **Match States**: Complete game state synchronization between clients
 
 ### Docker Configuration
 
-#### Current Setup (No Plugin)
+#### Production Setup with Go Plugin ✅
 
 ```yaml
-# docker-compose.yml uses local-no-plugin.yml
-entrypoint: >
-  /nakama/nakama --config /nakama/data/local-no-plugin.yml
+# docker-compose.yml - Current working configuration
+services:
+  nakama:
+    build: .
+    entrypoint:
+      - '/bin/sh'
+      - '-ecx'
+      - >
+        /nakama/nakama migrate up --database.address postgres:localdb@postgres:5432/nakama &&
+        exec /nakama/nakama --config /nakama/data/local.yml
 ```
 
-#### Go Plugin Setup (When Fixed)
-
 ```dockerfile
-# Dockerfile - uncomment when protobuf issue resolved
-COPY --from=builder /backend/backend.so /nakama/data/modules/
+# Dockerfile - Go plugin compilation and deployment
+FROM heroiclabs/nakama-pluginbuilder:3.32.0 AS builder
+WORKDIR /backend
+COPY . .
+RUN go build --trimpath --mod=vendor --buildmode=plugin -o ./backend.so
+
+FROM heroiclabs/nakama:3.32.0
+COPY --from=builder /backend/backend.so /nakama/data/modules
+COPY --from=builder /backend/local.yml /nakama/data/
 ```
 
 ### Nakama Configuration
 
-#### Matchmaking Settings
+#### Server Settings
 
 ```yaml
-# local.yml / local-no-plugin.yml
+# local.yml - Production configuration
+name: nakama-tictactoe
+runtime:
+  go:
+    path: '/nakama/data/modules'
 matchmaker:
   interval_sec: 1
   max_tickets: 1000
+leaderboard:
+  blacklist_rank_cache:
+    - 'ttt_leaderboard'
 ```
 
 ### Testing & Validation
 
-#### Test Script: `test-token-matchmaking.js`
+#### Server-Authoritative Match Testing ✅
 
-- Simulates two players joining matchmaker
-- Tests token-based match joining
-- Validates real-time game communication
-- Confirms match presence and data exchange
+**Test Coverage**:
 
-**Results**: ✅ Full client-relayed multiplayer working
+- ✅ Matchmaking: Players matched and connected to authoritative matches
+- ✅ Game Logic: Server validates moves and enforces rules
+- ✅ Match States: Win, draw, forfeit conditions properly handled
+- ✅ Leaderboard: Stats updated automatically after each match
+- ✅ RPC Endpoints: Leaderboard and player statistics retrieval working
 
-- Matchmaking: ✅ Players matched successfully
-- Match joining: ✅ Token-based joining works
-- Game communication: ✅ Real-time move data exchange
-- Match presence: ✅ Players see each other join/leave
+**Validation Results**:
 
-### Future Implementation Path
+- **Matchmaking**: Custom callback creates matches with proper game mode
+- **Anti-Cheat**: Server rejects invalid moves and prevents rule violations
+- **Game Flow**: Complete match lifecycle from join to completion
+- **Statistics**: Real-time leaderboard updates with accurate scoring
+- **Performance**: Low-latency real-time gameplay with server authority
 
-#### Option 1: Fix Go Plugin (Recommended for Production)
+### Implementation Architecture
 
-1. Resolve protobuf version compatibility
-2. Enable server-authoritative matches
-3. Implement complete game logic in Go
-4. Add anti-cheat and game validation
+#### Current Status: Production-Ready Server-Authoritative System ✅
 
-#### Option 2: Client-Side Game Logic (Current Working Solution)
+**Features Complete**:
 
-1. Implement Tic-Tac-Toe logic in React Native
-2. Use client-relayed matches for communication
-3. Handle game state synchronization client-side
-4. Accept reduced cheat protection for faster development
+- **Server-Authoritative Matches**: Full game logic validation and anti-cheat
+- **Global Leaderboard**: Persistent ranking system with comprehensive statistics
+- **Match Modes**: Support for different game modes (classic, etc.)
+- **Real-time Communication**: Low-latency WebSocket game state synchronization
+- **RPC API**: RESTful endpoints for leaderboard and player data
+- **Docker Deployment**: Containerized production-ready setup
 
-### Architecture Comparison
+**Architecture Benefits**:
 
-| Feature           | Server-Authoritative | Client-Relayed |
-| ----------------- | -------------------- | -------------- |
-| Cheat Protection  | ✅ Full              | ⚠️ Limited     |
-| Development Speed | ⚠️ Complex           | ✅ Fast        |
-| Server Load       | ⚠️ Higher            | ✅ Lower       |
-| Network Latency   | ⚠️ Higher            | ✅ Lower       |
-| Current Status    | ❌ Blocked           | ✅ Working     |
+- **Security**: Server validates all moves, prevents cheating
+- **Reliability**: Authoritative game state prevents desynchronization
+- **Scalability**: Nakama's proven multiplayer infrastructure
+- **Performance**: Efficient real-time communication with minimal latency
+- **Data Persistence**: Permanent leaderboard and player statistics
 
-**Recommendation**: Continue with client-relayed approach for MVP, migrate to server-authoritative later.
+#### Migration from Client-Relayed to Server-Authoritative ✅
+
+The system has been successfully migrated from client-relayed matches to full server authority:
+
+- **Before**: Client-side game logic with limited validation
+- **After**: Complete server-side game rules with cheat prevention
+- **Improvement**: Enhanced security and reliable game state management
 
 ### React Native Frontend Integration
 
-#### Implementation Status ✅
+#### Updated Integration for Server-Authoritative Matches ✅
 
-The frontend has been updated to support the working token-based matchmaking approach.
+**Location**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
+**Status**: ✅ Updated to work with server-authoritative matches
 
-**File**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
+**Key Integration Points**:
 
-#### Key Changes Made
-
-1. **Updated Matchmaker Query**
+1. **Matchmaking with Server Authority**:
 
 ```typescript
-// Changed from Go plugin specific query to universal query
-const MATCHMAKER_QUERY = '*'; // Works with token-based matchmaking
+// Matchmaker connects to server-authoritative matches
+const MATCHMAKER_QUERY = '*'; // Universal query for server matches
+await socket.addMatchmaker(MATCHMAKER_QUERY, 2, 2, { mode: 'classic' }, {});
 ```
 
-2. **Enhanced Match Joining Logic**
+2. **Server-Authoritative Match Joining**:
 
 ```typescript
 const handleMatchFound = React.useCallback(
   async (socket: Socket, matched: MatchmakerMatched) => {
-    console.log('🎉 Matchmaker matched event:', {
-      matchId: matched.match_id,
-      hasToken: !!matched.token,
-      ticket: matched.ticket,
-    });
+    console.log('🎉 Server-authoritative match found:', matched.match_id);
 
-    let match: Match;
-    if (matched.match_id) {
-      // Server-authoritative match (if Go plugin is working)
-      console.log('🔗 Joining server-authoritative match:', matched.match_id);
-      match = await socket.joinMatch(matched.match_id);
-    } else if (matched.token) {
-      // Client-relayed match with JWT token (current working approach)
-      console.log('🎫 Joining token-based match with token');
-      match = await socket.joinMatch(undefined as any, matched.token);
-    } else {
-      throw new Error('No match ID or token provided in matchmaker result');
-    }
+    // Join server-authoritative match directly with match ID
+    const match = await socket.joinMatch(matched.match_id);
+    console.log('✅ Joined authoritative match:', match.match_id);
 
-    console.log('✅ Successfully joined match:', match.match_id);
-    // ... rest of match setup
+    // Server handles all game state - client just renders
   },
   [cleanupMatchmaking, resetBoard],
 );
 ```
 
-3. **Improved Error Handling**
+3. **Server-Validated Game Communication**:
 
 ```typescript
-} catch (error) {
-  console.error('Failed to join match:', error);
-  const errorMessage = matched.match_id ?
-    'Failed to join server-authoritative match. The Go plugin may not be working.' :
-    'Failed to join token-based match. Please try again.';
-
-  setPhase('error');
-  setErrorMessage(errorMessage);
-  await cleanupMatchmaking();
-}
-```
-
-#### Current Flow
-
-1. **Authentication**: Player authenticates and connects to Nakama WebSocket
-2. **Matchmaking**: `socket.addMatchmaker("*", 2, 2, { mode: "classic" }, {})`
-3. **Match Found**: `onmatchmakermatched` receives JWT token
-4. **Join Match**: `socket.joinMatch(undefined, token)` creates/joins client-relayed match
-5. **Game Play**: Real-time communication via `sendMatchState` and `onmatchdata`
-
-#### Testing Results
-
-- ✅ **Development Server**: Starts without TypeScript errors
-- ✅ **Matchmaking Query**: Universal "\*" query works with built-in Nakama
-- ✅ **Error Handling**: Graceful fallback between server-authoritative and token-based
-- ✅ **Logging**: Comprehensive debugging output for development
-
-#### Game State Management (Client-Relayed)
-
-Since we're using client-relayed matches, the React Native frontend handles:
-
-```typescript
-// Send moves to opponent
+// Send moves to server for validation
 const sendMove = async (position: number) => {
   if (matchRef.current && yourMark && currentTurnMark === yourMark) {
-    const moveData = { position, player: displayName, mark: yourMark };
+    const moveData = { index: position };
     await socket.sendMatchState(
       matchRef.current.match_id,
       MATCH_OPCODE_PLAYER_MOVE,
@@ -244,31 +221,33 @@ const sendMove = async (position: number) => {
   }
 };
 
-// Receive opponent moves
+// Receive server-validated game updates
 socket.onmatchdata = (message) => {
-  if (message.op_code === MATCH_OPCODE_PLAYER_MOVE) {
-    const moveData = JSON.parse(new TextDecoder().decode(message.data));
-    // Update local board state
-    // Check win conditions
-    // Switch turns
+  if (message.op_code === MATCH_OPCODE_BOARD_UPDATE) {
+    const serverState = JSON.parse(new TextDecoder().decode(message.data));
+    // Update local state with server-authoritative data
+    updateGameState(serverState);
   }
 };
 ```
 
-#### Advantages of Current Implementation
+#### Server Communication Flow
 
-- **Fast Development**: No server-side game logic needed
-- **Low Latency**: Direct peer-to-peer communication
-- **Reliable**: Uses Nakama's proven matchmaking system
-- **Debugging**: Comprehensive logging and error handling
-- **Scalable**: Minimal server resources required
+1. **Matchmaking**: Client requests match via matchmaker
+2. **Server Match**: Server creates authoritative match with game logic
+3. **Join Match**: Client joins using server-provided match ID
+4. **Game Play**: All moves validated by server before state updates
+5. **Game End**: Server determines winner and updates leaderboard automatically
 
-#### Production Considerations
+#### Integration Benefits
 
-- **Security**: Limited cheat protection (acceptable for casual Tic-Tac-Toe)
-- **Synchronization**: Clients must handle state conflicts gracefully
-- **Connection Loss**: Implement reconnection and game state recovery
-- **Future Migration**: Easy upgrade path to server-authoritative when Go plugin is fixed
+- **Simplified Client**: No client-side game logic needed
+- **Cheat Prevention**: Server validates all moves and game rules
+- **Reliable State**: Single source of truth prevents desynchronization
+- **Automatic Stats**: Leaderboard updated server-side after each match
+- **Error Handling**: Server provides clear error messages for invalid moves
+
+**Status**: ✅ **FULLY INTEGRATED WITH SERVER-AUTHORITATIVE BACKEND**
 
 ### Quick Start Guide
 
@@ -276,138 +255,38 @@ socket.onmatchdata = (message) => {
 
 1. **Start Backend**: `docker compose -f backend/docker-compose.yml up --build -d`
 2. **Start Frontend**: `pnpm --filter frontend start`
-3. **Test Matchmaking**: Open two browser tabs or use two devices
-4. **Play**: Players are automatically matched and can play Tic-Tac-Toe in real-time
+3. **Test Multiplayer**: Open multiple clients and test matchmaking
+4. **Verify Leaderboard**: Play matches and check leaderboard updates
 
 #### Key Files
 
-- **Backend Config**: `backend/local-no-plugin.yml` (current working config)
-- **Matchmaking Logic**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
+- **Backend Logic**: `backend/main.go` (initialization and RPC), `backend/match.go` (game logic)
+- **Docker Config**: `backend/docker-compose.yml`, `backend/Dockerfile`
+- **Server Config**: `backend/local.yml`
+- **Frontend Integration**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
 - **Network Service**: `frontend/src/services/nakama.ts`
-- **Test Script**: `frontend/test-token-matchmaking.js` (validated working implementation)
 
-**Status**: 🎮 **READY FOR MULTIPLAYER TIC-TAC-TOE GAMEPLAY** 🎮
+**Status**: 🎮 **PRODUCTION-READY SERVER-AUTHORITATIVE MULTIPLAYER** 🎮
+
+#### API Endpoints
+
+**RPC Functions Available**:
+
+- `get_leaderboard`: Returns top players with rankings and W/L/D statistics
+- `get_player_stats`: Returns individual player statistics and current rank
+
+**Usage Example**:
+
+```typescript
+// Fetch leaderboard
+const response = await client.rpc(session, 'get_leaderboard', { limit: 50 });
+const leaderboard = JSON.parse(response.payload);
+
+// Get player stats
+const statsResponse = await client.rpc(session, 'get_player_stats', { userId: 'player123' });
+const playerStats = JSON.parse(statsResponse.payload);
+```
 
 ### React Native Frontend Integration
 
-#### Updated PlayerGameScreen Implementation ✅
-
-**Location**: `frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx`
-**Status**: ✅ Updated to support token-based matchmaking
-
-**Key Changes Made**:
-
-1. **Matchmaker Query Updated**:
-
-```typescript
-// Changed from server-authoritative query to universal query
-const MATCHMAKER_QUERY = '*'; // Works with token-based matchmaking
-// Was: const MATCHMAKER_QUERY = '+mode:classic'; // Requires Go plugin
-```
-
-2. **Token-Based Match Joining**:
-
-```typescript
-const handleMatchFound = React.useCallback(
-  async (socket: Socket, matched: MatchmakerMatched) => {
-    console.log('🎉 Matchmaker matched event:', {
-      matchId: matched.match_id,
-      hasToken: !!matched.token,
-      ticket: matched.ticket,
-    });
-
-    let match: Match;
-    if (matched.match_id) {
-      // Server-authoritative match (if Go plugin is working)
-      console.log('🔗 Joining server-authoritative match:', matched.match_id);
-      match = await socket.joinMatch(matched.match_id);
-    } else if (matched.token) {
-      // Client-relayed match with JWT token (current working approach)
-      console.log('🎫 Joining token-based match with token');
-      match = await socket.joinMatch(undefined as any, matched.token);
-    } else {
-      throw new Error('No match ID or token provided in matchmaker result');
-    }
-
-    console.log('✅ Successfully joined match:', match.match_id);
-    // ... rest of match setup
-  },
-  [cleanupMatchmaking, resetBoard],
-);
-```
-
-3. **Enhanced Error Handling**:
-
-```typescript
-} catch (error) {
-  console.error('Failed to join match:', error);
-  const errorMessage = matched.match_id ?
-    'Failed to join server-authoritative match. The Go plugin may not be working.' :
-    'Failed to join token-based match. Please try again.';
-
-  setPhase('error');
-  setErrorMessage(errorMessage);
-  await cleanupMatchmaking();
-}
-```
-
-#### Matchmaking Flow Comparison
-
-**Original (Server-Authoritative - Not Working)**:
-
-```
-Player → addMatchmaker() → matched.match_id → joinMatch(match_id) → ❌ "Match not found"
-```
-
-**Updated (Token-Based - Working)**:
-
-```
-Player → addMatchmaker() → matched.token → joinMatch(null, token) → ✅ Match joined successfully
-```
-
-#### Real-time Game Communication
-
-The existing game communication code works with both approaches:
-
-```typescript
-// Send moves (works with both match types)
-await socket.sendMatchState(matchId, MATCH_OPCODE_PLAYER_MOVE, moveData);
-
-// Receive game updates (works with both match types)
-socket.onmatchdata = (message) => {
-  const data = decodeMatchData(message.data);
-  // Handle game state updates
-};
-
-// Match presence (works with both match types)
-socket.onmatchpresence = (presence) => {
-  // Handle players joining/leaving
-};
-```
-
-#### Testing Status
-
-**Development Server**: ✅ Running successfully
-**Compilation**: ✅ No critical TypeScript errors
-**Matchmaking Logic**: ✅ Updated to handle tokens
-**Fallback Support**: ✅ Supports both server-authoritative and client-relayed
-
-#### Expected User Experience
-
-1. **Matchmaking Phase**: "Searching for an opponent..."
-2. **Token Received**: Console shows "🎫 Joining token-based match with token"
-3. **Match Joined**: "✅ Successfully joined match: [match-id]"
-4. **Game Start**: Players see each other, can make moves in real-time
-5. **Game Communication**: Moves sync between players via WebSocket
-
-#### Integration with Existing Code
-
-The implementation maintains compatibility with:
-
-- ✅ Existing game logic (board state, win detection)
-- ✅ UI components (GameBoard, game symbols, status display)
-- ✅ Player context and state management
-- ✅ Match lifecycle (connecting → matching → joining → playing)
-- ✅ Error handling and cleanup
-
-**No Breaking Changes**: The frontend gracefully handles both match types and will work when the Go plugin is eventually fixed.
+**Status**: ✅ **FULLY INTEGRATED WITH SERVER-AUTHORITATIVE BACKEND**

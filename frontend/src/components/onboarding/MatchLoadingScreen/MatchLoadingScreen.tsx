@@ -28,21 +28,22 @@ const MatchLoadingContentPlayer: React.FC = () => {
     phase,
     startMatchmaking,
     cleanupMatchmaking,
+    resetMatchState,
     currentMatch,
     statusMessage,
     opponentName,
     opponentConnected,
     mode,
-    resultLabel,
-    resultTone,
     errorMessage,
     isMatchmakingRequested,
   } = useMatchmaking(); // Destructure specific properties
 
-  const handleCancel = React.useCallback(() => {
-    cleanupMatchmaking();
+  const handleCancel = React.useCallback(async () => {
+    console.log('🚫 User cancelled matchmaking, cleaning up and resetting state');
+    await cleanupMatchmaking();
+    resetMatchState();
     navigation.navigate('Home');
-  }, [navigation, cleanupMatchmaking]);
+  }, [navigation, cleanupMatchmaking, resetMatchState]);
 
   const handleMatchSuccess = React.useCallback(() => {
     // Navigate to PlayerGame when match is ready
@@ -114,8 +115,6 @@ const MatchLoadingContentPlayer: React.FC = () => {
               opponentName={opponentName}
               opponentConnected={opponentConnected}
               mode={mode}
-              resultLabel={resultLabel}
-              resultTone={resultTone}
               errorMessage={errorMessage}
               showSpinner={true}
             />
