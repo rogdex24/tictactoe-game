@@ -130,7 +130,6 @@ jobs:
             echo "🌿 Branch: ${{ steps.branch-info.outputs.BRANCH_NAME }}"
             echo "📝 Commit: ${{ steps.branch-info.outputs.COMMIT_SHORT }}"
             echo "🎯 Environment: ${{ github.event.inputs.environment }}"
-            echo "💾 Backup location: $BACKUP_DIR"
             echo ""
             echo "📊 Service Status:"
             sudo docker compose ps
