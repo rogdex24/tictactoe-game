@@ -444,8 +444,7 @@ class NakamaService {
 
     try {
       const response = await this.client.rpc(this.currentSession, 'get_player_stats', { userId });
-      const payload = typeof response.payload === 'string' ? response.payload : '{}';
-      return JSON.parse(payload);
+      return response.payload;
     } catch (error) {
       console.error('Failed to get player stats:', error);
       throw error;
