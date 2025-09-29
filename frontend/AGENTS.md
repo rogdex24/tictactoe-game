@@ -59,8 +59,9 @@ graph TD
 - Purpose: Bridge between lobby and gameplay, either spinning up a bot match or waiting for multiplayer matchmaking to complete.
 - Routes: Bot mode jumps straight to Game after auth; player mode waits for `phase` to become `playing` before navigating to PlayerGame, and both variants cancel back to Home (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:31-37`, `:96-137`).
 - Components: `MatchStatusCard`, `LoadingSpinner`, `CustomButton`, `BackgroundGlow` wrappers for status UX (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:16-19`, `:74-89`, `:154-160`).
-- Shared state/services: Uses `usePlayer` and `useAuthCheck` for identity and auth; player mode also consumes `useMatchmaking` actions like `startMatchmaking` and `cleanupMatchmaking` (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:24-55`).
-- Caveats: Avoid double-starting matchmaking—`startMatchmaking` is idempotent but gated by refs; if you relocate the provider higher in the tree, ensure `cleanupMatchmaking` still runs on cancel to release tickets and sockets.
+- Shared state/services: Uses `usePlayer` and `useAuthCheck` for identity and auth; player mode also consumes `useMatchmaking` actions like `startMatchmaking`, `cleanupMatchmaking`, and `resetMatchState` (`frontend/src/components/onboarding/MatchLoadingScreen/MatchLoadingScreen.tsx:24-55`).
+- Enhanced Cancel Behavior: Cancel handler now properly calls both `cleanupMatchmaking()` AND `resetMatchState()` to ensure complete state reset, preventing stale matchmaking flags that could block subsequent game starts.
+- Caveats: Avoid double-starting matchmaking—`startMatchmaking` is idempotent but gated by refs; if you relocate the provider higher in the tree, ensure `cleanupMatchmaking` still runs on cancel to release tickets and sockets; the enhanced cancel ensures `isMatchmakingRequested` is properly reset.
 
 \*\*GameScreen.tsx (`frontend/src/components/game/GameScreen/GameScreen.tsx`)
 
@@ -76,21 +77,179 @@ graph TD
 - Routes: Landed from MatchLoading once a match is ready; primary button returns to Home while optionally retrying on errors (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:52-124`).
 - Components: `MatchStatusCard`, `GameBoard`, `CustomButton`, `TextButton`, `BackgroundGlow` (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:15-19`, `:99-125`).
 - Shared state/services: Leans on `useMatchmaking` for board state, marks, connectivity, and actions plus `usePlayer` for display name (`frontend/src/components/player/PlayerGameScreen/PlayerGameScreen.tsx:27-118`).
-- Caveats: `sendMove` short-circuits unless it is your turn and the opponent is connected—surface UX for disabled board states instead of bypassing the guard; remember that App.tsx wraps this route with its own `MatchmakingProvider`, so share state via services (or lift the provider) if you need continuity from MatchLoading.
+- Auto-Cleanup on Completion: Game completion now triggers automatic cleanup in `MatchmakingContext` rather than manual cleanup in button handlers, improving UX with faster response times for "Go Home" and "Play Again" actions.
+- Optimized Button Handlers:
+  - **handleGoHome**: Now synchronous, only calls `resetMatchState()` and navigates (cleanup happens automatically)
+  - **handlePlayAgain**: Simplified to reset state, request new matchmaking, and navigate without manual cleanup delays
+  - **handleLeaveGame**: Retains manual cleanup for mid-game exits (not completion-based scenarios)
+- Caveats: `sendMove` short-circuits unless it is your turn and the opponent is connected—surface UX for disabled board states instead of bypassing the guard; remember that App.tsx wraps this route with its own `MatchmakingProvider`, so share state via services (or lift the provider) if you need continuity from MatchLoading; automatic cleanup reduces user wait times while maintaining proper resource management.
 
 \*\*LeaderboardScreen.tsx (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx`)
 
-- Purpose: Static leaderboard showcase with a simple list and back CTA.
-- Routes: Reached from Home or Game; both Back and Play Again buttons return to Home (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:91-138`).
-- Components: `BackButton`, `CustomButton`, `BackgroundGlow`, `FlatList` renderer for entries (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:13-137`).
-- Shared state/services: No global context usage beyond navigation—data is currently mock data local to the screen.
-- Caveats: Replace the hard-coded dataset with service data in one place so the shape stays aligned with backend responses; maintain consistent key/score fields when wiring Nakama RPCs.
+- Purpose: Global leaderboard displaying real player statistics with server-side data integration.
+- Routes: Reached from Home or Game; both Back and Play Again buttons return to Home (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:140-160`).
+- Components: `BackButton`, `CustomButton`, `BackgroundGlow`, `FlatList` renderer with enhanced row styling and current user highlighting (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:13-137`).
+- Shared state/services: Integrates with `nakamaService.getLeaderboard()` RPC call for real-time data; uses session to identify and highlight current user's entry (`frontend/src/components/leaderboard/LeaderboardScreen/LeaderboardScreen.tsx:89-95`).
+- Enhanced Features:
+  - **Real-time Data**: Loads live leaderboard data from Nakama backend via RPC calls
+  - **Current User Highlighting**: Automatically highlights the logged-in user's entry with teal styling and "(You)" indicator
+  - **Rich Statistics**: Displays wins/losses/draws/games played alongside cumulative scores
+  - **Enhanced UI**: Improved column headers with ExtraBold font and teal glow effects, better spacing between Games and Score columns
+  - **Loading States**: Proper loading, error, and empty state handling with retry functionality
+- Caveats: Depends on active Nakama session for user identification; handles both authenticated and guest states gracefully; maintains responsive design with proper TypeScript interfaces.
 
 ## Shared State Touchpoints
 
 - `PlayerContext` (`frontend/src/state/PlayerContext.tsx:21-123`) owns the player name, session, and auth helpers consumed by Home, PlayerName, MatchLoading, Game, and PlayerGame; always run mutations (`setPlayerName`, `authenticate`, `updatePlayerName`) through the context so SecureStore/localStorage stay in sync.
-- `MatchmakingContext` (`frontend/src/state/MatchmakingContext.tsx:63-264`) wraps the multiplayer socket lifecycle. Both MatchLoading (player mode) and PlayerGame depend on it for match phases, board state, and cleanup. Keep the provider lifetime consistent if you refactor navigation; otherwise hoist it to the navigator level.
+- `MatchmakingContext` (`frontend/src/state/MatchmakingContext.tsx:63-264`) wraps the multiplayer socket lifecycle with enhanced auto-cleanup functionality. Both MatchLoading (player mode) and PlayerGame depend on it for match phases, board state, and cleanup. **Auto-cleanup**: When game phase becomes 'complete', automatic cleanup occurs after a 1-second delay, removing the need for manual cleanup in UI components. Keep the provider lifetime consistent if you refactor navigation; otherwise hoist it to the navigator level.
 - `useAuthCheck` (`frontend/src/hooks/useAuthCheck.ts:6-33`) is the lightweight gate before any networked flow. Call `ensureAuthenticated` prior to invoking Nakama services to avoid cascading failures from expired sessions.
+
+### Matchmaking System Improvements
+
+#### Auto-Cleanup on Game Completion
+
+The matchmaking system now features intelligent cleanup that automatically handles resource management:
+
+- **Automatic Trigger**: When game `phase` becomes `'complete'`, cleanup initiates automatically
+- **Timing**: 1-second delay allows users to see game results before cleanup
+- **Resource Management**: Automatically leaves match, removes tickets, and disconnects socket
+- **State Reset**: All matchmaking flags and references are cleared properly
+
+#### Enhanced Cancel Behavior
+
+MatchLoadingScreen cancel functionality has been improved for reliable state management:
+
+- **Complete Reset**: Cancel now calls both `cleanupMatchmaking()` AND `resetMatchState()`
+- **State Flags**: Properly resets `isMatchmakingRequested` to prevent stale state
+- **Phase Management**: Ensures `phase` returns to `'connecting'` for fresh starts
+- **Reliable Restart**: Users can immediately start new games after canceling
+
+#### Optimized Button Handlers
+
+PlayerGameScreen button handlers are now more responsive:
+
+- **handleGoHome**: Synchronous operation, no waiting for cleanup
+- **handlePlayAgain**: Immediate navigation to new matchmaking
+- **handleLeaveGame**: Retains manual cleanup for mid-game exits only
+
+#### Flow Improvements
+
+```
+Previous Flow:
+Game Complete → User Clicks Button → Manual Cleanup → Navigation (slow)
+
+Enhanced Flow:
+Game Complete → Auto Cleanup (1s delay) → User Clicks Button → Instant Navigation (fast)
+```
+
+#### Benefits
+
+- **Faster UX**: Button responses are instant after game completion
+- **Reliable State**: No stale matchmaking flags blocking subsequent games
+- **Resource Efficient**: Connections closed promptly after matches end
+- **Predictable Behavior**: Consistent cleanup regardless of user actions
+
+## Backend Integration & Leaderboard System
+
+### Overview
+
+The app features a comprehensive global leaderboard system powered by server-side Nakama integration. Players' match results are automatically tracked and ranked using a persistent scoring system.
+
+### Leaderboard Architecture
+
+#### Scoring Formula
+
+- **Base Score**: 100 points (ensures all scores remain positive for Nakama compatibility)
+- **Win Bonus**: +3 points per win
+- **Draw Bonus**: +1 point per draw
+- **Loss Penalty**: -1 point per loss
+- **Final Formula**: `100 + (3 × wins) + (1 × draws) - (1 × losses)`
+
+#### Server-Side Components
+
+- **RPC Endpoints**: `get_leaderboard` and `get_player_stats` for data retrieval
+- **Automatic Updates**: Match completion triggers immediate leaderboard updates
+- **Duplicate Prevention**: `LeaderboardUpdated` flag prevents multiple updates per match
+- **Comprehensive Logging**: Server tracks all leaderboard operations for debugging
+
+#### Data Structure
+
+```typescript
+interface LeaderboardRecord {
+  userId: string;
+  username: string;
+  score: number;
+  rank: number;
+  stats: {
+    wins: number;
+    losses: number;
+    draws: number;
+    games: number;
+  };
+}
+```
+
+### NakamaService Enhancements (`src/services/nakama.ts`)
+
+#### New Methods
+
+- **`getLeaderboard(limit?: number)`**: Fetches global leaderboard with player rankings and statistics
+- **`getPlayerStats(userId: string)`**: Retrieves detailed statistics for a specific player
+- **Enhanced Session Management**: Improved payload handling for RPC responses
+
+#### Key Features
+
+- **Direct Payload Access**: RPC responses are handled as objects, not strings, for better performance
+- **TypeScript Integration**: Fully typed interfaces for all leaderboard data structures
+- **Error Handling**: Comprehensive error catching with user-friendly messages
+- **Session Validation**: All RPC calls require active authentication
+
+### Frontend Integration
+
+#### LeaderboardScreen Enhancements
+
+- **Real-time Data**: Live leaderboard updates from backend via RPC calls
+- **Current User Highlighting**: Automatically identifies and highlights logged-in user's entry
+- **Enhanced Styling**:
+  - Column headers use ExtraBold font with teal glow effects
+  - Better spacing between Games and Score columns
+  - Current user gets special highlighting with teal theme and "(You)" indicator
+- **Loading States**: Proper loading, error, and empty state handling with retry functionality
+
+#### Match Completion Flow
+
+1. **Game Ends**: Server determines winner/loser/draw
+2. **Automatic Update**: Backend updates global leaderboard within 1 second
+3. **UI Refresh**: Frontend can fetch updated leaderboard data immediately
+4. **State Consistency**: All players see consistent rankings across sessions
+
+### Development & Testing
+
+#### Backend Verification
+
+- Test scripts validate scoring formulas and leaderboard updates
+- Comprehensive logging for debugging match completion issues
+- Simulation tools for testing various game scenarios
+
+#### Frontend Testing
+
+- Integration tests verify RPC call compatibility
+- UI tests ensure proper current user highlighting
+- Error state testing for network failures and authentication issues
+
+### Production Considerations
+
+#### Performance
+
+- Leaderboard queries are optimized with configurable limits
+- Efficient data structures minimize payload sizes
+- Proper indexing on backend for fast ranking calculations
+
+#### Scalability
+
+- Server-authoritative design prevents client-side score manipulation
+- Nakama's built-in leaderboard system handles concurrent updates
+- Automatic cleanup prevents stale match states
 
 ## Authentication Architecture
 
@@ -238,6 +397,62 @@ func beforeAuthenticateDevice(ctx context.Context, logger runtime.Logger, db *sq
     return in, nil
 }
 ```
+
+## Recent Changes (feat/global_leaderboard Branch)
+
+### Major Features Added
+
+#### ✨ Global Leaderboard System
+
+- **Real-time Rankings**: Live leaderboard displaying all players with wins/losses/draws/scores
+- **Server Integration**: Full Nakama backend integration with RPC endpoints
+- **Enhanced UI**: Beautiful leaderboard with current user highlighting and improved typography
+- **Persistent Statistics**: Player stats survive across app sessions and devices
+
+#### 🎮 Matchmaking Improvements
+
+- **Auto-Cleanup**: Games automatically clean up resources when completed
+- **Enhanced Cancel**: Proper state reset when canceling matchmaking
+- **Faster UX**: Instant button responses after game completion
+- **Reliable State**: No more stale matchmaking flags blocking new games
+
+#### 🔧 Backend Architecture
+
+- **Server-Authoritative**: All scoring and ranking handled server-side
+- **Scoring Formula**: Base score system ensures positive values (100 + 3W + 1D - 1L)
+- **Duplicate Prevention**: Smart flagging prevents multiple leaderboard updates per match
+- **Comprehensive Logging**: Full audit trail of all leaderboard operations
+
+### Files Modified
+
+#### Frontend Core
+
+- **LeaderboardScreen.tsx**: Complete rewrite with live data integration and user highlighting
+- **MatchmakingContext.tsx**: Added auto-cleanup on game completion
+- **MatchLoadingScreen.tsx**: Enhanced cancel behavior with proper state reset
+- **PlayerGameScreen.tsx**: Optimized button handlers for instant responses
+- **nakama.ts**: Added leaderboard RPC methods with TypeScript interfaces
+
+#### UI/UX Enhancements
+
+- **Enhanced Column Headers**: ExtraBold fonts with teal glow effects
+- **Current User Highlighting**: Automatic detection and styling of logged-in user
+- **Better Spacing**: Improved layout between Games and Score columns
+- **Loading States**: Proper error handling and retry functionality
+
+### Testing & Validation
+
+- **Integration Tests**: Verified frontend-backend compatibility
+- **Score Formula Tests**: Validated all scoring scenarios including edge cases
+- **State Management Tests**: Confirmed proper cleanup and reset behaviors
+- **UI Flow Tests**: Validated complete user journey from home to leaderboard
+
+### Performance Optimizations
+
+- **Efficient RPC Calls**: Direct object payload handling without string parsing
+- **Smart Cleanup**: Resource management happens automatically, reducing manual overhead
+- **Optimized Queries**: Configurable limits for leaderboard data fetching
+- **Memory Management**: Proper cleanup prevents memory leaks in long sessions
 
 ## Tooling & Commands
 
