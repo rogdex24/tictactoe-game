@@ -36,7 +36,7 @@ start_services_initial() {
     sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/fullchain.pem|/etc/nginx/ssl/fullchain.pem|g' nginx.conf
     sed -i.bak 's|/etc/letsencrypt/live/api.tictactoe.kauntalha.dev/privkey.pem|/etc/nginx/ssl/privkey.pem|g' nginx.conf
     
-    docker compose up -d postgres nakama nginx
+    sudo docker compose up -d postgres nakama nginx
     sleep 10
     echo "✅ Services started with self-signed certificate"
 }
@@ -46,7 +46,7 @@ obtain_letsencrypt_cert() {
     echo "🔐 Obtaining Let's Encrypt certificate..."
     
     # Run certbot to get the certificate
-    docker compose run --rm certbot certonly \
+    sudo docker compose run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email "$EMAIL" \
@@ -68,7 +68,7 @@ update_nginx_config() {
     fi
     
     # Reload nginx with new certificates
-    docker compose exec nginx nginx -s reload
+    sudo docker compose exec nginx nginx -s reload
     echo "✅ Nginx configuration updated"
 }
 
@@ -80,8 +80,8 @@ setup_renewal() {
     cat > renew-certs.sh << 'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
-docker compose run --rm certbot renew --webroot --webroot-path=/var/www/certbot
-docker compose exec nginx nginx -s reload
+sudo docker compose run --rm certbot renew --webroot --webroot-path=/var/www/certbot
+sudo docker compose exec nginx nginx -s reload
 echo "Certificate renewal completed at $(date)"
 EOF
     
