@@ -6,12 +6,18 @@ import React from 'react';
 import { colors } from '../../../styles/colors';
 import { iconSizes } from '../../../styles/dimensions';
 
-export const GameIcons: React.FC = () => {
+interface GameIconsProps {
+  small?: boolean;
+}
+
+export const GameIcons: React.FC<GameIconsProps> = ({ small = false }) => {
+  const circleSize = small ? 96 : iconSizes.homeCircle; // was 144
+  const crossSize = small ? 110 : iconSizes.homeCross; // was 176
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       <SvgComponent
-        width={iconSizes.homeCircle}
-        height={iconSizes.homeCircle}
+        width={circleSize}
+        height={circleSize}
         viewBox="0 0 100 100"
         style={[styles.icon, styles.circle]}
       >
@@ -26,8 +32,8 @@ export const GameIcons: React.FC = () => {
         />
       </SvgComponent>
       <SvgComponent
-        width={iconSizes.homeCross}
-        height={iconSizes.homeCross}
+        width={crossSize}
+        height={crossSize}
         viewBox="0 0 100 100"
         style={[styles.icon, styles.cross]}
       >

@@ -36,6 +36,12 @@
       "display": "standalone",
       "orientation": "portrait",
       "startUrl": "/",
+      "viewport": {
+        "width": "device-width",
+        "initialScale": 1,
+        "maximumScale": 1,
+        "userScalable": false
+      },
       "build": {
         "babel": {
           "include": ["@react-native/polyfills"]

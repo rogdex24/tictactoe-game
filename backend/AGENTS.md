@@ -21,6 +21,10 @@ go mod vendor
 Delete and build the server again
 
 ```bash
+# For development
+docker compose -f backend/docker-compose.dev.yml down && docker compose -f backend/docker-compose.dev.yml up --build -d
+
+# For production
 docker compose -f backend/docker-compose.yml down && docker compose -f backend/docker-compose.yml up --build -d
 ````
 
@@ -320,7 +324,9 @@ socket.onmatchdata = (message) => {
 
 #### For Developers
 
-1. **Start Backend**: `docker compose -f backend/docker-compose.yml up --build -d`
+1. **Start Backend**:
+   - Development: `docker compose -f backend/docker-compose.dev.yml up --build -d`
+   - Production: `docker compose -f backend/docker-compose.yml up --build -d`
 2. **Start Frontend**: `pnpm --filter frontend start`
 3. **Test Multiple Game Modes**:
    - Select different modes in UI (Classic vs Blitz)

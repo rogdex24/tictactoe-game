@@ -54,11 +54,19 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
 
 4. Start the backend services using Docker Compose (recommended)
 
+   **For development (simplified, no SSL/nginx):**
+
+   ```bash
+   docker compose -f backend/docker-compose.dev.yml up -d
+   ```
+
+   **For production (with nginx and SSL):**
+
    ```bash
    docker compose -f backend/docker-compose.yml up -d
    ```
 
-   This starts both PostgreSQL and Nakama with the compiled Go plugin.
+   Both options start PostgreSQL and Nakama with the compiled Go plugin.
 
 5. (Optional) For native development, download the Nakama macOS binary
 
@@ -83,6 +91,14 @@ The repository combines an Expo React Native client, Go plugins for Nakama, and 
    ```
 
 9. Stop the backend services
+
+   **For development:**
+
+   ```bash
+   docker compose -f backend/docker-compose.dev.yml down
+   ```
+
+   **For production:**
 
    ```bash
    docker compose -f backend/docker-compose.yml down
@@ -146,8 +162,9 @@ stay in sync.
 
 ### Infrastructure
 
-- `docker compose -f backend/docker-compose.yml up -d` – Start local PostgreSQL and Nakama services
-- `docker compose -f backend/docker-compose.yml up -d postgres` – Start local Postgres only
+- `docker compose -f backend/docker-compose.dev.yml up -d` – Start local PostgreSQL and Nakama services (development)
+- `docker compose -f backend/docker-compose.yml up -d` – Start local PostgreSQL, Nakama, Nginx, and Certbot services (production)
+- `docker compose -f backend/docker-compose.dev.yml up -d postgres` – Start local Postgres only (development)
 
 ## Environment Variables
 
