@@ -11,10 +11,12 @@ import {
 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuthCheck } from '../../../hooks/useAuthCheck';
 import { nakamaService } from '../../../services/nakama';
+import { usePlayer } from '../../../state/PlayerContext';
 import { colors } from '../../../styles/colors';
 import { layout, radius, spacing } from '../../../styles/dimensions';
 import { typography } from '../../../styles/typography';
@@ -83,21 +85,23 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; isCurrentUser?: boolea
 
 export const LeaderboardScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { playerName } = usePlayer();
+  const trimmedName = playerName.trim();
+  const hasPlayerName = trimmedName.length > 0;
+  const { ensureAuthenticated } = useAuthCheck();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    // Get current user ID from session
-    const session = nakamaService.getSession();
-    if (session && session.user_id) {
-      setCurrentUserId(session.user_id);
-    }
-    loadLeaderboard();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -129,14 +133,55 @@ export const LeaderboardScreen: React.FC = () => {
         });
       }
 
-      setLeaderboardData(leaderboardEntries);
+      if (isMountedRef.current) {
+        setLeaderboardData(leaderboardEntries);
+      }
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
-      setError('Failed to load leaderboard data');
+      if (isMountedRef.current) {
+        setError('Failed to load leaderboard data');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  const verifyAndLoad = useCallback(async () => {
+    if (!hasPlayerName) {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      navigation.navigate('PlayerName', { nextScreen: 'Leaderboard' });
+      return;
+    }
+
+    try {
+      await ensureAuthenticated();
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      const session = nakamaService.getSession();
+      if (isMountedRef.current) {
+        setCurrentUserId(session?.user_id ?? null);
+      }
+
+      await loadLeaderboard();
+    } catch (err) {
+      console.error('Failed to authenticate for leaderboard:', err);
+      if (isMountedRef.current) {
+        setError('Authentication required to view leaderboard.');
+        setLoading(false);
+      }
+      navigation.navigate('PlayerName', { nextScreen: 'Leaderboard' });
+    }
+  }, [ensureAuthenticated, hasPlayerName, loadLeaderboard, navigation]);
+
+  useEffect(() => {
+    void verifyAndLoad();
+  }, [verifyAndLoad]);
 
   const handleBack = () => {
     navigation.navigate('Home');
@@ -184,7 +229,13 @@ export const LeaderboardScreen: React.FC = () => {
             ) : error ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <CustomButton label="Retry" onPress={loadLeaderboard} style={styles.retryButton} />
+                <CustomButton
+                  label="Retry"
+                  onPress={() => {
+                    void verifyAndLoad();
+                  }}
+                  style={styles.retryButton}
+                />
               </View>
             ) : leaderboardData.length === 0 ? (
               <View style={styles.emptyContainer}>
