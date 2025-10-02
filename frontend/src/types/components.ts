@@ -1,7 +1,7 @@
 import type { GameMode } from './game';
 
 export type PlayerNameScreenParams = {
-  nextScreen?: 'Home' | 'MatchLoading' | 'PlayerGame';
+  nextScreen?: 'Home' | 'MatchLoading' | 'PlayerGame' | 'Leaderboard';
   mode?: 'bot' | 'player'; // For when nextScreen is 'MatchLoading'
   gameMode?: GameMode; // For when nextScreen is 'MatchLoading' and mode is 'player'
 };

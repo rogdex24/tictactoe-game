@@ -62,6 +62,8 @@ export const PlayerNameScreen: React.FC = () => {
         navigation.navigate('MatchLoading', { mode, gameMode });
       } else if (nextScreen === 'Home') {
         navigation.navigate('Home');
+      } else if (nextScreen === 'Leaderboard') {
+        navigation.navigate('Leaderboard');
       } else if (nextScreen === 'PlayerGame') {
         navigation.navigate('PlayerGame');
       } else {
@@ -75,6 +77,8 @@ export const PlayerNameScreen: React.FC = () => {
         navigation.navigate('MatchLoading', { mode, gameMode });
       } else if (nextScreen === 'Home') {
         navigation.navigate('Home');
+      } else if (nextScreen === 'Leaderboard') {
+        navigation.navigate('Leaderboard');
       } else if (nextScreen === 'PlayerGame') {
         navigation.navigate('PlayerGame');
       } else {
